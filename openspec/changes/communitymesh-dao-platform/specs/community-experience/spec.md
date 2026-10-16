@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Gives members one coherent web experience for local listings, profiles, contributor work, governance, and transparent AI operations across desktop and mobile devices.
+Gives members one coherent, installable web experience for local listings, profiles, contributor work, governance, and transparent AI operations across desktop and mobile devices, including when disconnected.
 
 ## ADDED Requirements
 
@@ -49,3 +49,25 @@ The application MUST keep its core navigation and workflows operable at narrow a
 #### Scenario: Navigate by keyboard
 - **WHEN** a member navigates the application using a keyboard
 - **THEN** interactive controls are reachable in a logical order and expose their purpose and state
+
+### Requirement: The installed application shell is available offline
+The application MUST allow an installed PWA to open its navigation and previously visited route shells without a network connection.
+
+#### Scenario: Launch the installed application offline
+- **WHEN** a member launches the installed application while disconnected
+- **THEN** the application opens its cached shell and provides navigation to core destinations
+
+#### Scenario: Open a route without cached data
+- **WHEN** a member opens a route offline whose records are not stored on the device
+- **THEN** the application keeps the route usable and explains that its data requires a connection
+
+### Requirement: The application exposes synchronization state
+The application MUST distinguish locally saved pending changes, synchronized changes, and unresolved conflicts in the affected workflows.
+
+#### Scenario: View a queued change
+- **WHEN** a member views a change that has not yet been accepted by the server
+- **THEN** the application identifies it as pending and does not present it as server-confirmed
+
+#### Scenario: Resolve a conflicting edit
+- **WHEN** synchronization detects an overlapping edit requiring member resolution
+- **THEN** the application presents both values and lets the member select which value to submit

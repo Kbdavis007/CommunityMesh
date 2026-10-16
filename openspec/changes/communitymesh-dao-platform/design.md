@@ -11,11 +11,13 @@ The behavior contracts are in `specs/community-listings/spec.md`, `specs/communi
 **Goals:**
 - Keep privileged service credentials and application data access behind Cloudflare Workers.
 - Give each data store a clear owner and make cross-store effects retry-safe and auditable.
+- Keep the application usable with previously synchronized data during intermittent connectivity, without treating an unconfirmed local write as server truth.
 - Keep AI actions bounded, observable, and reversible by human review.
 - Make the initial deployment operable within verified free-tier limits, with graceful degradation when quotas are exhausted.
 
 **Non-Goals:**
 - Blockchain consensus, public token trading, token-weighted voting, or guaranteed resistance to a Cloudflare or Supabase outage.
+- Offline task claims and governance votes, real-time synchronization guarantees, or complete offline copies of all account data.
 - Autonomous permanent moderation, autonomous governance execution outside an allowlisted action handler, or autonomous changes to production policy.
 - Guaranteeing that provider free tiers, AI models, or account policies remain unchanged over time.
 
@@ -29,12 +31,29 @@ The behavior contracts are in `specs/community-listings/spec.md`, `specs/communi
 
 **Alternative considered:** Direct browser access to Supabase would simplify some CRUD, but it conflicts with the all-API-through-Workers boundary and creates a second authorization path. It is not selected.
 
+### PWA and offline synchronization
+
+- Ship a web manifest and installable PWA. The service worker precaches versioned application-shell assets in Cache Storage and serves the shell for supported routes while offline. Do not use Cache Storage as the record database or cache authenticated API responses there.
+- Use IndexedDB as the durable client record store. Feature repositories read from IndexedDB first and update the rendered view as synchronization applies remote changes. Store public records only for the selected community and the minimum profile/task data needed by the signed-in member. Keep authentication secrets and private ballots out of this store; partition private records and queued operations by account.
+- Store supported local mutations in a durable outbox with a unique operation ID, account ID, entity ID, and base server revision. The initial offline write set is listing create/edit/archive, own-profile edits, and task-completion evidence. Task claims and governance votes require a live server response. Listing text may be drafted offline; image upload remains online-only in the first release.
+- Expose authenticated Worker sync endpoints for idempotent outbox submission and incremental downloads. Use per-source monotonic cursors for Supabase and D1 changes, plus tombstones for deletions. Advance a device cursor only after the returned page is committed to IndexedDB. The server validates every operation and remains authoritative for accepted revisions, task claims, votes, credits, governance outcomes, and moderation decisions.
+- Compare each mutation's base revision with the current server revision. Merge disjoint field updates; preserve both values for an overlapping field and return a conflict for member resolution. A resolution is submitted as a new idempotent operation against the latest server revision, never as an unconditional overwrite.
+- Let the service worker request background synchronization where the browser supports it. Also trigger synchronization on application startup, foregrounding, and the browser's online event; background execution is best-effort, not a delivery guarantee. Keep queued changes until the server acknowledges them, and expose pending, conflict, and last-successful-sync state in the UI.
+- Use same-origin secure, HttpOnly, SameSite session cookies for Worker requests so the service worker can make authenticated sync requests without storing bearer or refresh tokens in IndexedDB or Cache Storage. If the session expires, retain the account-scoped outbox and resume only after that account reauthenticates. On sign-out/account switch, require syncing or explicit discard of pending account changes before removing that account's private local cache.
+
+**Alternative considered:** Browser `localStorage` is simpler but is synchronous, small, and lacks transactional writes suitable for a durable multi-record outbox. IndexedDB is selected for structured, transactional local state. Relying only on Background Sync would miss browsers that lack it or delay execution, so foreground retry is also required.
+
 ### Data ownership and storage
 
 - Supabase Auth owns authentication identities. Supabase Postgres owns member profile fields, community membership, listings, image metadata, task records, and a task-completion outbox. Supabase Storage owns listing images. Listing search uses Postgres full-text search scoped by a stable community identifier and category; the first version uses ZIP/city labels rather than exposing precise member coordinates.
 - Cloudflare D1 owns DAO proposals, private vote records, governance execution history, the CC/WC/DT append-only ledger and balances, and AI run logs. Cross-database references use stable opaque user, task, and listing identifiers; there are no assumed cross-database foreign keys.
 - Keep the user-facing task lifecycle in Supabase as requested and the credit source of truth in D1. On approved task completion, a Postgres transaction marks the task complete and enqueues a uniquely keyed outbox event. A Worker applies the associated D1 credit entry using a unique source-event key, then marks the outbox event delivered. A scheduled reconciler retries undelivered events. D1's uniqueness constraint prevents duplicate awards if delivery or acknowledgment is retried.
-- Treat DAO Tokens as internal ledger units with no transfer, redemption, or monetary promise. They do not affect voting power. Credit award rules and amounts are published, versioned configuration; a ledger adjustment creates a compensating entry rather than editing history.
+- Store DAO Tokens as D1 ledger units using integer milli-token subunits, where 1 DT is 1,000 subunits and 0.001 DT is one subunit; never use floating-point amounts. Contribution Credits and Work Credits remain separate, non-transferable measures. Tokens do not affect voting power.
+- Define a versioned action-reward catalog with an amount, credit type, eligibility, frequency limits, and unique source-event key for each qualifying action. A qualifying login awards 0.001 DT once per member/community/UTC day. Workers mint only when a published rule authorizes the event; a client cannot invoke an arbitrary mint operation. Task rewards are emitted only after the existing task-review approval.
+- Apply token mint, same-community transfer, and perk redemption as append-only D1 ledger events with idempotency keys and balance constraints. A transfer atomically debits one member and credits another without changing total supply. Redeeming a published, non-cash in-app perk atomically debits and retires the spent units while recording the perk and fulfillment state. Corrections use compensating entries rather than editing history.
+- Implement these domain rules in the Worker and D1 ledger. Do not add a blockchain or web3 token package: the product has no external-chain or cryptographic-token behavior, and a package would not define the app-specific reward, transfer, or perk rules. Use ordinary integer accounting and test its invariants; do not hand-roll cryptography.
+
+**Alternative considered:** A blockchain token or a web3/NFT library would add a chain, wallet, and transaction-cost dependency that conflicts with the no-external-blockchain requirement. A generic npm token package would not replace the required D1 accounting rules. A transactional application ledger is selected.
 
 **Alternative considered:** Keeping task state and credits in one database would simplify transactions, but would contradict the requested Supabase task / D1 credit ownership. The outbox plus idempotent consumer is selected to make that boundary recoverable without claiming a distributed transaction.
 
@@ -71,10 +90,15 @@ The behavior contracts are in `specs/community-listings/spec.md`, `specs/communi
 - [Two managed providers create operational dependency and lock-in] → Keep Worker API contracts and SQL migrations explicit, document exports/backups and recovery, and describe the result as community-governed hosted infrastructure rather than fully decentralized.
 - [Public AI activity leaks sensitive content] → Store minimal structured outcomes, exclude private profile data, and keep raw prompts/responses out of public views by default.
 - [Free-tier services cannot meet production demand] → Treat initial rollout as quota-bounded; implement pagination, limits, retention, and graceful degradation, and require a separate decision before any paid upgrade.
+- [Browser storage is evicted, full, or unavailable] → Handle failed writes explicitly, keep the remote stores authoritative, bound cached data, and offer a reconnect/reload path without claiming that offline data is a backup.
+- [Background Sync is unsupported or delayed] → Retry on startup, foregrounding, and connectivity restoration, and keep queued changes visibly pending until acknowledged.
+- [A device remains offline while a server record changes] → Use revisions, tombstones, explicit same-field conflict resolution, and server authority for sensitive outcomes rather than last-write-wins.
+- [Action rewards can be farmed through repeated or automated activity] → Reward accepted server-side domain events, require a published rule and unique source key, apply frequency limits (including one login reward per UTC day), and configure per-action caps and abuse monitoring.
+- [Transfers or perk redemption create disputes or apparent monetary expectations] → Limit transfers to members of the same community, publish non-cash perk terms, record both sides of a transfer and every redemption, and prohibit cash or external-chain withdrawal.
 
 ## Migration Plan
 
-This is a greenfield deployment; there is no existing production data to migrate. Create versioned Supabase and D1 schema migrations, configure secrets and bindings for a non-production environment, and deploy the Worker API and Pages application before enabling scheduled agents. Validate Auth, ownership checks, listing search, task completion/outbox reconciliation, governance snapshots and execution idempotency, and AI hold/review flows with test data. Verify free-tier/account constraints before production setup, then enable agent schedules with conservative limits. Roll back by disabling Cron Triggers and routing traffic away from the new Pages/Worker deployment; preserve database records and use forward migrations or documented exports rather than destructive schema rollback.
+This is a greenfield deployment; there is no existing production data to migrate. Create versioned Supabase, D1, and IndexedDB schema migrations, configure secrets and bindings for a non-production environment, and deploy the Worker API and Pages/PWA shell before enabling scheduled agents. Validate Auth, ownership checks, offline shell startup, local-first reads, bidirectional cursor sync, outbox retry, conflict resolution, task completion/outbox reconciliation, governance snapshots and execution idempotency, and AI hold/review flows with test data. Verify free-tier/account constraints before production setup, then enable agent schedules with conservative limits. Roll back by disabling Cron Triggers and routing traffic away from the new Pages/Worker deployment; preserve database records and use forward migrations or documented exports rather than destructive schema rollback. A service-worker release must retain compatibility with pending outbox records or provide a tested migration before deleting an older cache/database version.
 
 ## Open Questions
 

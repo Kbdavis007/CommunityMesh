@@ -3,30 +3,37 @@
 ## 1. Provider and Project Foundations
 
 - [ ] 1.1 Verify current Cloudflare and Supabase payment-method requirements, free-tier quotas, and Cloudflare AI model availability for the intended deployment; record dated sources in deployment notes and stop for a user decision if a required service cannot meet the no-payment constraint.
-- [ ] 1.2 Scaffold the React/Vite/TypeScript client with Tailwind CSS and build, lint, and test scripts; verify dependency installation and a production build.
+- [ ] 1.2 Scaffold the React/Vite/TypeScript client with Tailwind CSS, an installable PWA manifest, versioned service-worker app-shell caching, and build/lint/test scripts; verify installation metadata, offline shell startup, and a production build.
 - [ ] 1.3 Scaffold the Cloudflare Worker API with typed environment bindings, local development configuration, and a versioned health route; verify the route with a Worker test.
 - [ ] 1.4 Define the route map and component hierarchy for home, local hub, listing search/detail/create, profile, contributor tasks, governance, and AI activity; verify route navigation and not-found behavior in client tests and document the hierarchy.
 
 ## 2. Persistence and Data Contracts
 
 - [ ] 2.1 Add versioned Supabase SQL migrations for profiles, communities, membership, the six listing categories, listing images, tasks, and the task-completion outbox; verify migrations apply cleanly and constraints/search indexes with database tests.
-- [ ] 2.2 Add versioned D1 migrations for proposals, private votes, governance execution history, CC/WC/DT ledger and balances, and AI run logs; verify constraints, uniqueness, and indexes with D1 migration tests.
+- [ ] 2.2 Add versioned D1 migrations for proposals, private votes, governance execution history, CC/WC balances, integer milli-DAO-Token balances and mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, idempotency constraints, and indexes with D1 migration tests.
 - [ ] 2.3 Document schema ownership, migration commands, required Cloudflare bindings, and Supabase configuration; verify setup steps against a clean development environment.
+- [ ] 2.4 Add versioned IndexedDB schemas for scoped cached records, account-partitioned pending operations, per-source sync cursors, and unresolved conflicts; verify transactional writes, schema upgrade, and storage-failure behavior in browser tests.
+- [ ] 2.5 Add version/revision metadata, per-store incremental change feeds, and deletion tombstones for synchronized Supabase and D1 records; verify cursor pagination returns changes without gaps or duplicate application.
 
 ## 3. Identity and Listing Services
 
-- [ ] 3.1 Implement Worker-mediated Supabase Auth flows and access-token verification with role and community authorization; verify unauthenticated requests fail and valid member requests pass API tests.
+- [ ] 3.1 Implement Worker-mediated Supabase Auth flows and secure HttpOnly session cookies with role and community authorization; verify unauthenticated requests fail, valid member requests pass, and tokens are absent from browser-managed record storage.
 - [ ] 3.2 Implement profile read/update and privacy-filtered trust activity endpoints; verify private fields are omitted for other members and profile tests pass.
 - [ ] 3.3 Implement listing create/edit/archive, community-scoped full-text search and category filters for all six categories; verify validation, ownership, active-state, and cross-community isolation cases with API tests.
 - [ ] 3.4 Implement authorized image upload and listing image association with configured type and size limits; verify invalid and unauthorized uploads are rejected and document the upload flow.
 - [ ] 3.5 Document the versioned identity and listing API contracts; verify each documented request and response against the API tests.
+- [ ] 3.6 Implement authenticated Worker sync endpoints for idempotent local-operation submission, incremental downloads, per-store cursors, tombstones, and revision-based conflict detection; verify interrupted retries do not duplicate accepted writes and unauthorized operations are rejected.
+- [ ] 3.7 Document the sync protocol, cursor acknowledgment rules, operation idempotency, and conflict response contract; verify examples against sync endpoint tests.
 
 ## 4. Community Web Workflows
 
 - [ ] 4.1 Build the shared responsive application shell, accessible navigation, and local-hub selection for supported ZIP/city entries; verify keyboard navigation, narrow viewport layout, and unsupported-location behavior.
 - [ ] 4.2 Build listing search, filters, detail, create/edit, image, and temporary-hold/appeal views; verify loading, empty, success, and error states with component or browser tests.
 - [ ] 4.3 Build member profile and reputation views with privacy-aware fields and activity explanations; verify profile visibility behavior with UI tests.
-- [ ] 4.4 Document route behavior and local development commands; verify the route guide matches the implemented route tests.
+- [ ] 4.4 Document route behavior, PWA installation, offline route-shell behavior, and local development commands; verify the guide matches route and service-worker tests.
+- [ ] 4.5 Make feature repositories render from IndexedDB first and coordinate service-worker background sync with startup, foreground, and connectivity-triggered retries; verify cached views load offline and show last successful sync time.
+- [ ] 4.6 Queue offline listing create/edit/archive, own-profile edits, and task-completion evidence while keeping task claims and votes online-only; verify pending states, reconnect submission, and session-expiry handling in browser/API tests.
+- [ ] 4.7 Build member-facing same-field conflict resolution that preserves both versions and resubmits against the latest revision; verify overlapping and non-overlapping multi-device edit scenarios in UI tests.
 
 ## 5. DAO Governance
 
@@ -38,9 +45,13 @@
 ## 6. Contributor Tasks and Credits
 
 - [ ] 6.1 Implement task discovery, atomic claim, evidence submission, reviewer decision, and task status transitions; verify concurrent claims and rejected/approved completion paths with database-backed tests.
-- [ ] 6.2 Implement transactional Supabase completion-outbox delivery to the D1 credit ledger, separate CC/WC/DT balances, published award rules, compensating adjustments, and scheduled reconciliation; verify retries and injected delivery failures produce at most one award.
+- [ ] 6.2 Implement transactional Supabase completion-outbox delivery to the D1 credit ledger, separate CC/WC/DT balances, task reward minting, compensating adjustments, and scheduled reconciliation; verify retries and injected delivery failures produce at most one award.
 - [ ] 6.3 Build contributor task and credit-history views with distinct non-monetary balances and pending award state; verify award status and history rendering with UI/API integration tests.
 - [ ] 6.4 Document task review, award configuration, outbox recovery, and ledger reconciliation; verify the documented recovery procedure against a simulated failed delivery.
+- [ ] 6.5 Inventory supported member action events and implement a versioned reward catalog for each qualifying action, including 0.001 DAO Tokens for one successful login per member/community/UTC day; verify action coverage, frequency limits, source-event idempotency, and rejection of unconfigured mint requests.
+- [ ] 6.6 Implement atomic same-community DAO Token transfers and non-cash in-app perk redemption with ledger history; verify insufficient-balance and cross-community requests fail, retries do not duplicate entries, and transfers conserve total supply.
+- [ ] 6.7 Build DAO Token balance, reward-history, transfer, and perk-catalog/redemption views; verify published amounts, pending/confirmed states, and rejected operations in UI/API tests.
+- [ ] 6.8 Document milli-token precision, mint authorization, action reward rules, transfer limits, perk terms, and correction procedures; verify documented flows against ledger tests and confirm no external blockchain integration is required.
 
 ## 7. Scheduled AI Operations
 
@@ -54,5 +65,5 @@
 ## 8. Deployment and End-to-End Verification
 
 - [ ] 8.1 Configure staging Pages, Worker routes, D1 bindings, Supabase Auth/Storage, secrets, CORS, and initial community, governance, credit, and schedule values; verify a staging deployment uses no unapproved paid service.
-- [ ] 8.2 Run end-to-end tests for signup, community-scoped listing search, listing moderation appeal, task completion and credit reconciliation, proposal voting/execution, and AI run visibility; verify desktop/mobile layout and keyboard accessibility.
+- [ ] 8.2 Run end-to-end tests for signup, community-scoped listing search, listing moderation appeal, task completion and credit reconciliation, daily login rewards, token transfer and perk redemption, proposal voting/execution, AI run visibility, offline app launch/local reads, bidirectional sync/retry, storage failure, and multi-device conflict resolution; verify supported-browser behavior, desktop/mobile layout, and keyboard accessibility.
 - [ ] 8.3 Complete operator documentation for Cloudflare Pages/Workers, Supabase setup, schema deployment, AI configuration, backups/exports, quota monitoring, and rollback; verify each setup and rollback command in staging.
