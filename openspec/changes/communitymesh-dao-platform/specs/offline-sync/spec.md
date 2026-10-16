@@ -17,6 +17,28 @@ The application MUST display the most recently synchronized public data for the 
 - **WHEN** a member requests data that has not been synchronized to the device
 - **THEN** the application explains that the data is unavailable offline and does not show it as current
 
+### Requirement: Eligible public images are cached on the device
+The application MUST cache eligible public CDN images for offline reuse and MUST keep their cache metadata, including `cache_version`, in the local data store.
+
+#### Scenario: Reuse a cached public image offline
+- **WHEN** a member opens a view offline containing a previously cached public image
+- **THEN** the application renders the local image and does not request it from the remote CDN
+
+#### Scenario: Avoid caching protected images
+- **WHEN** an image is protected or its response is not eligible for public caching
+- **THEN** the application does not place it in the shared service-worker image cache
+
+### Requirement: Asset cache versions invalidate stale images
+The application MUST compare cached image metadata with the current asset `cache_version` and replace stale cached content when a newer version is available.
+
+#### Scenario: Asset version changes
+- **WHEN** synchronization reports a changed `cache_version` for an image
+- **THEN** the application invalidates the old cached representation and fetches the current image when online
+
+#### Scenario: Asset version is unchanged
+- **WHEN** the synchronized `cache_version` matches the cached image version
+- **THEN** the application reuses the cached representation without an unnecessary image download
+
 ### Requirement: Supported offline changes are durably queued
 The application MUST let a signed-in member create, edit, or archive listings, edit their own profile, and submit task-completion evidence offline, and MUST mark each queued change as pending until the server accepts it.
 

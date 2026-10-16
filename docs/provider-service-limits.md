@@ -9,6 +9,7 @@ This note records the current, provider-published limits and conditions for the 
 - Cloudflare Workers Free is a real free tier, but it is limited to 100,000 requests/day, 10 ms CPU time per request, 128 MB memory, and low daily quotas for related services. It is not a perpetual no-cost operating model and is subject to provider policy changes.
 - Cloudflare Pages Free is available but limited to 500 builds/month and 20,000 files/site; function traffic counts against Workers quotas.
 - Cloudflare D1 Free includes 5 million rows read/day, 100,000 rows written/day, and 5 GB storage. On Workers Free, daily read/write exhaustion blocks further queries; Workers Paid meters usage above its included allowances.
+- Cloudflare R2 includes 10 GB-month storage, 1 million Class A operations, and 10 million Class B operations each month, with no egress bandwidth charges. Creating a bucket requires adding an R2 subscription through checkout; the public setup docs do not say whether that checkout requires a payment method for every account.
 - Workers AI currently includes 10,000 Neurons/day at no charge. Above that, AI inference requires Workers Paid and is billed at the current published rate; some models require a paid billing method even within the free allocation.
 - Supabase Free is genuinely free for small projects but strictly bounded: 2 active projects, 500 MB DB, 50,000 MAUs, 1 GB file storage, and 5 GB egress. Free projects can be paused after inactivity and backups are not available for download.
 - The architecture should treat Cloudflare + Supabase as managed providers and not assume provider-independent decentralization or indefinite free operation.
@@ -71,6 +72,24 @@ Important operational notes:
 - Docs say the Free plan will always include the ability to prototype and experiment with D1 for free.
 - On Workers Free, exceeding daily read/write thresholds blocks further D1 queries until reset; exceeding storage prevents additional writes/schema operations until space is freed or the account is upgraded. Workers Paid removes daily limits and meters usage.
 
+### Cloudflare R2
+
+Provider docs: https://developers.cloudflare.com/r2/pricing/ and https://developers.cloudflare.com/r2/get-started/
+
+Current free monthly usage from Cloudflare's R2 pricing page:
+
+- Storage: 10 GB-month
+- Class A operations: 1 million requests
+- Class B operations: 10 million requests
+- Egress bandwidth: no charge
+
+Important activation and billing notes:
+
+- Cloudflare's R2 setup guide requires an R2 subscription and instructs the account owner to complete a checkout flow before creating buckets.
+- R2 usage above the monthly free allowances is billable. The public setup and pricing pages reviewed do not say whether the checkout flow requires a payment method for every account, and no account-specific checkout was available to verify here.
+- Do not promise that R2 can be enabled without billing details or that usage above the free allowance will be blocked. Confirm the actual account's checkout requirements and billing controls before enabling the `r2_assets` bucket.
+- The R2 pricing page was checked on 2026-10-16; the getting-started and bucket-creation guides were also reviewed on that date.
+
 ### Cloudflare Workers AI
 
 Provider docs: https://developers.cloudflare.com/workers-ai/platform/pricing/ and https://developers.cloudflare.com/workers-ai/models/
@@ -119,6 +138,7 @@ Operational caveats in the provider docs:
 Important account and payment requirements:
 
 - Cloudflare's Workers pricing page says users have access to the Workers Free plan by default; Workers Paid starts at $5/month/account. The public pricing page does not state a universal payment-method requirement for every account's free-plan provisioning.
+- Cloudflare's R2 setup guide requires adding an R2 subscription through checkout, but does not document whether checkout requires a payment method for every account. Verify this in the deployment account before provisioning the required bucket.
 - Supabase's pricing and billing pages list a $0 Free plan and two active projects. Those public pages do not establish a universal credit-card/payment-method rule for every signup or account. Verify the actual Cloudflare and Supabase account flows before deployment rather than promising that no payment method will be requested.
 - Workers AI's pricing page lists 10,000 Neurons/day at no charge; use above that requires Workers Paid. Some named frontier models require a paid billing method. `@cf/meta/llama-3.2-1b-instruct` has a current model documentation page and is not among the paid-method-only exceptions listed on the pricing page. The Llama 3.1 8B Fast model documentation URL returned 404 on this verification date, although its identifier remains in the pricing table; do not rely on it without a successful account/model-catalog check.
 - Supabase Free is a viable no-cost pilot option within its limits, but it does not satisfy a requirement for guaranteed continuous availability or downloadable provider-managed backups: projects with low activity may be paused after seven days, and Free projects have no downloadable database backups. If either capability is required for production, a paid plan or a different architecture is needed.
@@ -166,6 +186,9 @@ These are not edge conditions; they are part of the current free-plan operating 
 - Cloudflare Pages pricing: https://developers.cloudflare.com/pages/platform/pricing/
 - Cloudflare Pages limits: https://developers.cloudflare.com/pages/platform/limits/
 - Cloudflare D1 pricing: https://developers.cloudflare.com/d1/platform/pricing/
+- Cloudflare R2 pricing: https://developers.cloudflare.com/r2/pricing/
+- Cloudflare R2 getting started: https://developers.cloudflare.com/r2/get-started/
+- Cloudflare R2 bucket creation: https://developers.cloudflare.com/r2/buckets/create-buckets/
 - Cloudflare Workers AI pricing: https://developers.cloudflare.com/workers-ai/platform/pricing/
 - Cloudflare Workers AI models: https://developers.cloudflare.com/workers-ai/models/
 - Cloudflare Llama 3.2 1B model documentation: https://developers.cloudflare.com/workers-ai/models/llama-3.2-1b-instruct/

@@ -6,16 +6,23 @@ CREATE TABLE community_policy_versions (
   policy_json TEXT NOT NULL CHECK (
     json_valid(policy_json)
     AND json_type(policy_json) = 'object'
-    AND json_type(policy_json, '$.rewardRules') = 'array'
-    AND json_type(policy_json, '$.rtToVtConversion') = 'object'
-    AND json_type(policy_json, '$.perks') = 'array'
-    AND json_type(policy_json, '$.governance') = 'object'
+    AND COALESCE(json_type(policy_json, '$.rewardRules'), '') = 'array'
+    AND COALESCE(json_type(policy_json, '$.rtToVtConversion'), '') = 'object'
+    AND COALESCE(json_type(policy_json, '$.perks'), '') = 'array'
+    AND COALESCE(json_type(policy_json, '$.governance'), '') = 'object'
+    AND COALESCE(json_type(policy_json, '$.tokenUnits'), '') = 'object'
+    AND COALESCE(json_type(policy_json, '$.tokenUnits.rtSubunitsPerToken'), '') = 'integer'
+    AND json_extract(policy_json, '$.tokenUnits.rtSubunitsPerToken') > 0
+    AND COALESCE(json_type(policy_json, '$.tokenUnits.vtSubunitsPerToken'), '') = 'integer'
+    AND json_extract(policy_json, '$.tokenUnits.vtSubunitsPerToken') > 0
   ),
   submitted_by TEXT NOT NULL,
   approved_by_proposal_id TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   effective_at TEXT,
-  PRIMARY KEY (community_id, version)
+  PRIMARY KEY (community_id, version),
+  FOREIGN KEY (approved_by_proposal_id, community_id)
+    REFERENCES governance_proposals (proposal_id, community_id)
 );
 
 CREATE TABLE community_active_policies (
@@ -46,17 +53,23 @@ CREATE TABLE governance_proposals (
     OR
     (status <> 'draft' AND opens_at IS NOT NULL AND closes_at IS NOT NULL
       AND closes_at > opens_at)
-  )
+  ),
+  UNIQUE (proposal_id, community_id)
 );
 
 CREATE TABLE proposal_voting_snapshots (
   proposal_id TEXT PRIMARY KEY
     REFERENCES governance_proposals (proposal_id) ON DELETE RESTRICT,
+  community_id TEXT NOT NULL,
   eligible_vt_supply INTEGER NOT NULL CHECK (eligible_vt_supply >= 0),
   quorum_basis_points INTEGER NOT NULL CHECK (quorum_basis_points BETWEEN 0 AND 10000),
   approval_basis_points INTEGER NOT NULL CHECK (approval_basis_points BETWEEN 0 AND 10000),
   policy_version INTEGER NOT NULL CHECK (policy_version > 0),
-  opened_at TEXT NOT NULL
+  opened_at TEXT NOT NULL,
+  FOREIGN KEY (proposal_id, community_id)
+    REFERENCES governance_proposals (proposal_id, community_id) ON DELETE RESTRICT,
+  FOREIGN KEY (community_id, policy_version)
+    REFERENCES community_policy_versions (community_id, version) ON DELETE RESTRICT
 );
 
 CREATE TABLE proposal_voter_weights (
@@ -215,8 +228,13 @@ CREATE INDEX token_ledger_member_history_idx
   ON token_ledger_entries (community_id, member_id, created_at DESC);
 CREATE INDEX token_ledger_source_event_idx
   ON token_ledger_entries (source_event_id);
+CREATE INDEX community_policy_versions_approved_proposal_idx
+  ON community_policy_versions (approved_by_proposal_id)
+  WHERE approved_by_proposal_id IS NOT NULL;
 CREATE INDEX rt_transfers_member_history_idx
   ON rt_transfers (community_id, sender_id, created_at DESC);
+CREATE INDEX rt_transfers_recipient_history_idx
+  ON rt_transfers (community_id, recipient_id, created_at DESC);
 CREATE INDEX rt_perk_redemptions_member_history_idx
   ON rt_perk_redemptions (community_id, member_id, created_at DESC);
 CREATE INDEX ai_run_logs_agent_history_idx
@@ -246,4 +264,28 @@ CREATE TRIGGER community_policy_versions_no_delete
 BEFORE DELETE ON community_policy_versions
 BEGIN
   SELECT RAISE(ABORT, 'community policy versions are immutable');
+END;
+
+CREATE TRIGGER proposal_voting_snapshots_no_update
+BEFORE UPDATE ON proposal_voting_snapshots
+BEGIN
+  SELECT RAISE(ABORT, 'proposal voting snapshots are immutable');
+END;
+
+CREATE TRIGGER proposal_voting_snapshots_no_delete
+BEFORE DELETE ON proposal_voting_snapshots
+BEGIN
+  SELECT RAISE(ABORT, 'proposal voting snapshots are immutable');
+END;
+
+CREATE TRIGGER proposal_voter_weights_no_update
+BEFORE UPDATE ON proposal_voter_weights
+BEGIN
+  SELECT RAISE(ABORT, 'proposal voter weights are immutable');
+END;
+
+CREATE TRIGGER proposal_voter_weights_no_delete
+BEFORE DELETE ON proposal_voter_weights
+BEGIN
+  SELECT RAISE(ABORT, 'proposal voter weights are immutable');
 END;

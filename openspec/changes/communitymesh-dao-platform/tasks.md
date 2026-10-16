@@ -2,7 +2,7 @@
 
 ## 1. Provider and Project Foundations
 
-- [x] 1.1 Verify current Cloudflare and Supabase payment-method requirements, free-tier quotas, and Cloudflare AI model availability for the intended deployment; record dated sources in deployment notes and stop for a user decision if a required service cannot meet the no-payment constraint.
+- [ ] 1.1 Verify current Cloudflare and Supabase payment-method requirements, free-tier quotas, and Cloudflare AI model availability for the intended deployment; record dated sources in deployment notes and stop for a user decision if a required service cannot meet the no-payment constraint.
 - [x] 1.2 Scaffold the React/Vite/TypeScript client with Tailwind CSS, an installable PWA manifest, versioned service-worker app-shell caching, and build/lint/test scripts; verify installation metadata, offline shell startup, and a production build.
 - [x] 1.3 Scaffold the Cloudflare Worker API with typed environment bindings, local development configuration, and a versioned health route; verify the route with a Worker test.
 - [x] 1.4 Define the route map and component hierarchy for home, local hub, listing search/detail/create, profile, contributor tasks, governance, and AI activity; verify route navigation and not-found behavior in client tests and document the hierarchy.
@@ -10,18 +10,19 @@
 ## 2. Persistence and Data Contracts
 
 - [x] 2.1 Add versioned Supabase SQL migrations for profiles, communities, membership, the six listing categories, listing images, tasks, and the task-completion outbox; verify migrations apply cleanly and constraints/search indexes with database tests.
-- [ ] 2.2 Add versioned D1 migrations for proposals, private ballots and VT snapshots, governance execution history, versioned community policy, CC/WC balances, RT/VT balances in configured integer subunits, cumulative earned-RT milestones, RT mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, policy-version constraints, idempotency, and indexes with D1 migration tests.
-- [ ] 2.3 Document schema ownership, migration commands, required Cloudflare bindings, and Supabase configuration; verify setup steps against a clean development environment.
-- [ ] 2.4 Add versioned IndexedDB schemas for scoped cached records, account-partitioned pending operations, per-source sync cursors, and unresolved conflicts; verify transactional writes, schema upgrade, and storage-failure behavior in browser tests.
+- [x] 2.2 Add versioned D1 migrations for proposals, private ballots and VT snapshots, governance execution history, versioned community policy, CC/WC balances, RT/VT balances in configured integer subunits, cumulative earned-RT milestones, RT mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, policy-version constraints, idempotency, and indexes with D1 migration tests.
+- [ ] 2.3 Document schema ownership, migration commands, the `r2_assets` bucket and required Cloudflare bindings, and Supabase configuration; verify setup steps against a clean development environment.
+- [ ] 2.4 Add versioned IndexedDB schemas for scoped cached records, account-partitioned pending operations, per-source sync cursors, unresolved conflicts, and asset-cache metadata; verify transactional writes, schema upgrade, and storage-failure behavior in browser tests.
 - [ ] 2.5 Add version/revision metadata, per-store incremental change feeds, and deletion tombstones for synchronized Supabase and D1 records; verify cursor pagination returns changes without gaps or duplicate application.
+- [ ] 2.6 Add a versioned Supabase asset-metadata migration for `r2_key`, `cdn_url`, and `cache_version`, and configure the `r2_assets` bucket and Worker binding; verify migration, metadata constraints, and binding configuration in a clean development environment.
 
 ## 3. Identity and Listing Services
 
 - [ ] 3.1 Implement Worker-mediated Supabase Auth flows, secure HttpOnly session cookies, community-scoped member/Admin roles, and deployment-configured initial Admin assignment; verify unauthorized or cross-community Admin requests fail and tokens are absent from browser-managed record storage.
 - [ ] 3.2 Implement profile read/update and privacy-filtered trust activity endpoints; verify private fields are omitted for other members and profile tests pass.
 - [ ] 3.3 Implement listing create/edit/archive, community-scoped full-text search and category filters for all six categories; verify validation, ownership, active-state, and cross-community isolation cases with API tests.
-- [ ] 3.4 Implement authorized image upload and listing image association with configured type and size limits; verify invalid and unauthorized uploads are rejected and document the upload flow.
-- [ ] 3.5 Document the versioned identity and listing API contracts; verify each documented request and response against the API tests.
+- [ ] 3.4 Implement authorized short-lived upload URLs at `POST /r2/upload-url` and asset retrieval at `GET /r2/file/:id` and `GET /r2/image/:id`, associating listing images and other public assets with Supabase metadata; verify type, size, ownership, visibility, and expiry checks in API tests.
+- [ ] 3.5 Document the versioned identity, listing, and asset API contracts; verify each documented request and response against the API tests.
 - [ ] 3.6 Implement authenticated Worker sync endpoints for idempotent local-operation submission, incremental downloads, per-store cursors, tombstones, and revision-based conflict detection; verify interrupted retries do not duplicate accepted writes and unauthorized operations are rejected.
 - [ ] 3.7 Document the sync protocol, cursor acknowledgment rules, operation idempotency, and conflict response contract; verify examples against sync endpoint tests.
 
@@ -30,8 +31,8 @@
 - [ ] 4.1 Build the shared responsive application shell, accessible navigation, and local-hub selection for supported ZIP/city entries; verify keyboard navigation, narrow viewport layout, and unsupported-location behavior.
 - [ ] 4.2 Build listing search, filters, detail, create/edit, image, and temporary-hold/appeal views; verify loading, empty, success, and error states with component or browser tests.
 - [ ] 4.3 Build member profile and reputation views with privacy-aware fields and activity explanations; verify profile visibility behavior with UI tests.
-- [ ] 4.4 Document route behavior, PWA installation, offline route-shell behavior, and local development commands; verify the guide matches route and service-worker tests.
-- [ ] 4.5 Make feature repositories render from IndexedDB first and coordinate service-worker background sync with startup, foreground, and connectivity-triggered retries; verify cached views load offline and show last successful sync time.
+- [ ] 4.4 Document route behavior, PWA installation, offline route-shell and public-image behavior, and local development commands; verify the guide matches route and service-worker tests.
+- [ ] 4.5 Make feature repositories render from IndexedDB first, cache eligible public CDN images in the service worker, track asset metadata and `cache_version` in IndexedDB, invalidate stale images, and coordinate background sync with startup, foreground, and connectivity-triggered retries; verify offline image reuse, version refresh, and exclusion of protected media in browser tests.
 - [ ] 4.6 Queue offline listing create/edit/archive, own-profile edits, and task-completion evidence while keeping task claims and votes online-only; verify pending states, reconnect submission, and session-expiry handling in browser/API tests.
 - [ ] 4.7 Build member-facing same-field conflict resolution that preserves both versions and resubmits against the latest revision; verify overlapping and non-overlapping multi-device edit scenarios in UI tests.
 
@@ -67,7 +68,7 @@
 
 ## 8. Deployment and End-to-End Verification
 
-- [ ] 8.1 Configure staging Pages, Worker routes, D1 bindings, Supabase Auth/Storage, secrets, CORS, bootstrap Admin assignments, and complete initial community policy values; verify staging contains no source-coded economic defaults and uses no unapproved paid service.
-- [ ] 8.2 Run end-to-end tests for signup, community-scoped listing search, listing moderation appeal, task completion and credit reconciliation, configured RT rewards and VT conversion, Admin policy proposal/approval/rejection, RT transfer and perk redemption, weighted proposal voting/execution, AI run visibility, offline app launch/local reads, bidirectional sync/retry, storage failure, and multi-device conflict resolution; verify supported-browser behavior, desktop/mobile layout, and keyboard accessibility.
-- [ ] 8.3 Complete operator documentation for Cloudflare Pages/Workers, Supabase setup, schema deployment, AI configuration, backups/exports, quota monitoring, and rollback; verify each setup and rollback command in staging.
+- [ ] 8.1 Configure staging Pages, Worker routes, D1 and R2 bindings including `r2_assets`, Supabase Auth/Storage, secrets, CORS, bootstrap Admin assignments, and complete initial community policy values; verify staging contains no source-coded economic defaults and uses no unapproved paid service.
+- [ ] 8.2 Run end-to-end tests for signup, community-scoped listing search, listing moderation appeal, public asset upload/retrieval and migration without broken references, Supabase profile-image proxy authorization, CDN cache policy and version invalidation, task completion and credit reconciliation, configured RT rewards and VT conversion, Admin policy proposal/approval/rejection, RT transfer and perk redemption, weighted proposal voting/execution, AI run visibility, offline app launch/local reads and public-image reuse, bidirectional sync/retry, storage failure, and multi-device conflict resolution; verify supported-browser behavior, desktop/mobile layout, and keyboard accessibility.
+- [ ] 8.3 Complete operator documentation for Cloudflare Pages/Workers/R2, Supabase setup, asset migration, schema deployment, AI configuration, backups/exports, quota monitoring, and rollback; verify each setup and rollback command in staging.
 - [ ] 8.4 Build a deployment-operator-only provider-usage dashboard, separate from community Admin roles, with timestamped Cloudflare and Supabase quota snapshots, 70/80/90% configurable alerts, and stale/unavailable states; verify provider credentials stay server-side, private data is excluded, and quota exhaustion is visible without exposing billing data publicly.

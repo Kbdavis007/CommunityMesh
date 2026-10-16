@@ -27,8 +27,19 @@ describe("D1 governance and ledger migration", () => {
     expect(tables.map(({ name }) => name)).toContain("private_proposal_ballots");
     expect(tables.map(({ name }) => name)).toContain("token_ledger_entries");
     expect(tables.map(({ name }) => name)).toContain("ai_run_logs");
-    expect(indexes.map(({ name }) => name)).toContain("token_ledger_member_history_idx");
-    expect(indexes.map(({ name }) => name)).toContain("governance_proposals_open_close_idx");
+    expect(indexes.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "community_policy_versions_approved_proposal_idx",
+        "governance_proposals_open_close_idx",
+        "proposal_voter_weights_member_idx",
+        "rt_transfers_member_history_idx",
+        "rt_transfers_recipient_history_idx",
+        "token_ledger_member_history_idx",
+        "token_ledger_source_event_idx",
+        "ai_run_logs_agent_history_idx",
+        "ai_run_logs_status_started_idx",
+      ]),
+    );
     database.close();
   });
 
@@ -40,10 +51,18 @@ describe("D1 governance and ledger migration", () => {
       ) values (?, ?, ?, ?)
     `);
     const completePolicy =
-      '{"rewardRules":[],"rtToVtConversion":{},"perks":[],"governance":{}}';
+      '{"rewardRules":[],"rtToVtConversion":{},"perks":[],"governance":{},"tokenUnits":{"rtSubunitsPerToken":100,"vtSubunitsPerToken":1}}';
 
     expect(() =>
       insert.run("community-1", 1, '{"rewardRules":[]}', "member-1"),
+    ).toThrow();
+    expect(() =>
+      insert.run(
+        "community-1",
+        1,
+        '{"rewardRules":[],"rtToVtConversion":{},"perks":[],"governance":{},"tokenUnits":{"rtSubunitsPerToken":0,"vtSubunitsPerToken":1}}',
+        "member-1",
+      ),
     ).toThrow();
     insert.run("community-1", 1, completePolicy, "member-1");
     expect(() =>
@@ -57,6 +76,13 @@ describe("D1 governance and ledger migration", () => {
   it("requires snapshotted positive weights for a single private ballot", () => {
     const database = createDatabase();
     database.exec(`
+      insert into community_policy_versions (
+        community_id, version, policy_json, submitted_by
+      ) values (
+        'community-1', 1,
+        '{"rewardRules":[],"rtToVtConversion":{},"perks":[],"governance":{},"tokenUnits":{"rtSubunitsPerToken":100,"vtSubunitsPerToken":1}}',
+        'member-1'
+      );
       insert into governance_proposals (
         proposal_id, community_id, proposer_id, title, description,
         requested_action_json, status, opens_at, closes_at
@@ -65,9 +91,9 @@ describe("D1 governance and ledger migration", () => {
         'Proposal description.', '{}', 'open', '2026-01-01', '2026-01-02'
       );
       insert into proposal_voting_snapshots (
-        proposal_id, eligible_vt_supply, quorum_basis_points,
+        proposal_id, community_id, eligible_vt_supply, quorum_basis_points,
         approval_basis_points, policy_version, opened_at
-      ) values ('proposal-1', 10, 2000, 5001, 1, '2026-01-01');
+      ) values ('proposal-1', 'community-1', 10, 2000, 5001, 1, '2026-01-01');
       insert into proposal_voter_weights (proposal_id, member_id, voting_weight)
         values ('proposal-1', 'member-2', 3);
       insert into private_proposal_ballots (proposal_id, member_id, choice)
@@ -87,6 +113,47 @@ describe("D1 governance and ledger migration", () => {
     database.close();
   });
 
+  it("binds voting snapshots to the proposal community and an existing policy version", () => {
+    const database = createDatabase();
+    database.exec(`
+      insert into community_policy_versions (
+        community_id, version, policy_json, submitted_by
+      ) values (
+        'community-1', 1,
+        '{"rewardRules":[],"rtToVtConversion":{},"perks":[],"governance":{},"tokenUnits":{"rtSubunitsPerToken":100,"vtSubunitsPerToken":1}}',
+        'member-1'
+      );
+      insert into governance_proposals (
+        proposal_id, community_id, proposer_id, title, description,
+        requested_action_json, status, opens_at, closes_at
+      ) values (
+        'proposal-1', 'community-1', 'member-1', 'Test proposal',
+        'Proposal description.', '{}', 'open', '2026-01-01', '2026-01-02'
+      );
+    `);
+    const insertSnapshot = database.prepare(`
+      insert into proposal_voting_snapshots (
+        proposal_id, community_id, eligible_vt_supply, quorum_basis_points,
+        approval_basis_points, policy_version, opened_at
+      ) values (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    expect(() =>
+      insertSnapshot.run("proposal-1", "community-1", 10, 2000, 5001, 2, "2026-01-01"),
+    ).toThrow();
+    expect(() =>
+      insertSnapshot.run("proposal-1", "community-2", 10, 2000, 5001, 1, "2026-01-01"),
+    ).toThrow();
+    insertSnapshot.run("proposal-1", "community-1", 10, 2000, 5001, 1, "2026-01-01");
+
+    expect(() =>
+      database
+        .prepare("update proposal_voting_snapshots set eligible_vt_supply = 12 where proposal_id = ?")
+        .run("proposal-1"),
+    ).toThrow(/immutable/);
+    database.close();
+  });
+
   it("rejects negative balances and duplicate idempotency keys", () => {
     const database = createDatabase();
     const balanceInsert = database.prepare(`
@@ -95,6 +162,7 @@ describe("D1 governance and ledger migration", () => {
       ) values (?, ?, ?, ?)
     `);
     expect(() => balanceInsert.run("community-1", "member-1", "RT", -1)).toThrow();
+    expect(() => balanceInsert.run("community-1", "member-1", "RT", 1.5)).toThrow();
     balanceInsert.run("community-1", "member-1", "RT", 100);
 
     const transferInsert = database.prepare(`
@@ -106,6 +174,72 @@ describe("D1 governance and ledger migration", () => {
     transferInsert.run("event-1", "idempotency-1", "source-1", "community-1", "a", "b", 10);
     expect(() =>
       transferInsert.run("event-2", "idempotency-1", "source-2", "community-1", "a", "b", 10),
+    ).toThrow();
+    database.close();
+  });
+
+  it("enforces idempotent ledger source keys and policy-version references", () => {
+    const database = createDatabase();
+    database.prepare(`
+      insert into community_policy_versions (
+        community_id, version, policy_json, submitted_by
+      ) values (?, ?, ?, ?)
+    `).run(
+      "community-1",
+      1,
+      '{"rewardRules":[],"rtToVtConversion":{},"perks":[],"governance":{},"tokenUnits":{"rtSubunitsPerToken":100,"vtSubunitsPerToken":1}}',
+      "member-1",
+    );
+    const insertLedgerEntry = database.prepare(`
+      insert into token_ledger_entries (
+        entry_id, event_id, entry_index, source_event_id, community_id,
+        member_id, token_type, entry_type, amount_subunits, policy_version, reason
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const entry = [
+      "entry-1",
+      "event-1",
+      0,
+      "source-1",
+      "community-1",
+      "member-1",
+      "RT",
+      "mint",
+      10,
+      1,
+      "Configured reward rule",
+    ] as const;
+    insertLedgerEntry.run(...entry);
+
+    expect(() =>
+      insertLedgerEntry.run(
+        "entry-2",
+        "event-2",
+        0,
+        "source-1",
+        "community-1",
+        "member-1",
+        "RT",
+        "mint",
+        10,
+        1,
+        "Configured reward rule",
+      ),
+    ).toThrow();
+    expect(() =>
+      insertLedgerEntry.run(
+        "entry-3",
+        "event-3",
+        0,
+        "source-2",
+        "community-2",
+        "member-1",
+        "RT",
+        "mint",
+        10,
+        1,
+        "Configured reward rule",
+      ),
     ).toThrow();
     database.close();
   });
