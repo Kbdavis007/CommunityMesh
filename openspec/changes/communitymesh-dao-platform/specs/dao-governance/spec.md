@@ -28,6 +28,10 @@ The system MUST accept one ballot per eligible member per proposal and weight it
 - **WHEN** a member earns additional Voting Tokens after a proposal's voting period opens
 - **THEN** those tokens do not change the member's voting weight for that proposal
 
+#### Scenario: Member has no snapshotted Voting Tokens
+- **WHEN** a member with zero Voting Tokens in the proposal snapshot attempts to cast a ballot
+- **THEN** the system rejects the ballot because it has no voting weight
+
 #### Scenario: Duplicate or late vote
 - **WHEN** a member attempts to cast a second ballot or vote after the voting period closes
 - **THEN** the system rejects the vote and preserves the existing tally

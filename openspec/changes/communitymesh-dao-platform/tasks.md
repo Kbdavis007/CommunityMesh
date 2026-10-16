@@ -10,7 +10,7 @@
 ## 2. Persistence and Data Contracts
 
 - [ ] 2.1 Add versioned Supabase SQL migrations for profiles, communities, membership, the six listing categories, listing images, tasks, and the task-completion outbox; verify migrations apply cleanly and constraints/search indexes with database tests.
-- [ ] 2.2 Add versioned D1 migrations for proposals, private votes, governance execution history, CC/WC balances, integer milli-DAO-Token balances and mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, idempotency constraints, and indexes with D1 migration tests.
+- [ ] 2.2 Add versioned D1 migrations for proposals, private ballots and VT snapshots, governance execution history, CC/WC balances, integer milli-RT/milli-VT balances, cumulative earned-RT milestones, RT mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, idempotency constraints, and indexes with D1 migration tests.
 - [ ] 2.3 Document schema ownership, migration commands, required Cloudflare bindings, and Supabase configuration; verify setup steps against a clean development environment.
 - [ ] 2.4 Add versioned IndexedDB schemas for scoped cached records, account-partitioned pending operations, per-source sync cursors, and unresolved conflicts; verify transactional writes, schema upgrade, and storage-failure behavior in browser tests.
 - [ ] 2.5 Add version/revision metadata, per-store incremental change feeds, and deletion tombstones for synchronized Supabase and D1 records; verify cursor pagination returns changes without gaps or duplicate application.
@@ -37,21 +37,21 @@
 
 ## 5. DAO Governance
 
-- [ ] 5.1 Implement proposal creation and voting with a snapshotted eligible electorate and rule values, one account per vote, and private ballot records; verify duplicate, late, and ineligible votes are rejected by D1-backed tests.
-- [ ] 5.2 Implement quorum and approval tallying, public aggregate history, and an allowlisted idempotent execution registry; verify pass, fail, unsupported-action, and repeated-execution scenarios.
-- [ ] 5.3 Build proposal, voting, outcome, and governance-history views with AI summaries clearly marked as advisory; verify one-member-one-vote behavior and aggregate-only public display in UI/API integration tests.
-- [ ] 5.4 Document governance eligibility, threshold configuration, execution handlers, and operational review; verify examples match the implemented governance tests.
+- [ ] 5.1 Implement proposal creation and voting with snapshotted eligible members' VT balances and total VT supply, one private ballot per member, and immutable proposal-open voting weight; verify duplicate, late, zero-weight, and ineligible ballots are rejected by D1-backed tests.
+- [ ] 5.2 Implement quorum and approval tallying against snapshotted VT supply and weighted ballots, public aggregate history, and an allowlisted idempotent execution registry; verify pass, fail, unsupported-action, and repeated-execution scenarios.
+- [ ] 5.3 Build proposal, weighted voting, outcome, and governance-history views with AI summaries clearly marked as advisory; verify displayed VT weight, one-ballot-per-member behavior, and aggregate-only public results in UI/API integration tests.
+- [ ] 5.4 Document governance eligibility, VT conversion and snapshot rules, weighted threshold configuration, execution handlers, and operational review; verify examples match the implemented governance tests.
 
 ## 6. Contributor Tasks and Credits
 
 - [ ] 6.1 Implement task discovery, atomic claim, evidence submission, reviewer decision, and task status transitions; verify concurrent claims and rejected/approved completion paths with database-backed tests.
-- [ ] 6.2 Implement transactional Supabase completion-outbox delivery to the D1 credit ledger, separate CC/WC/DT balances, task reward minting, compensating adjustments, and scheduled reconciliation; verify retries and injected delivery failures produce at most one award.
+- [ ] 6.2 Implement transactional Supabase completion-outbox delivery to the D1 ledger, separate CC/WC/RT/VT balances, task reward minting, compensating adjustments, and scheduled reconciliation; verify retries and injected delivery failures produce at most one award.
 - [ ] 6.3 Build contributor task and credit-history views with distinct non-monetary balances and pending award state; verify award status and history rendering with UI/API integration tests.
 - [ ] 6.4 Document task review, award configuration, outbox recovery, and ledger reconciliation; verify the documented recovery procedure against a simulated failed delivery.
-- [ ] 6.5 Inventory supported member action events and implement a versioned reward catalog for each qualifying action, including 0.001 DAO Tokens for one successful login per member/community/UTC day; verify action coverage, frequency limits, source-event idempotency, and rejection of unconfigured mint requests.
-- [ ] 6.6 Implement atomic same-community DAO Token transfers and non-cash in-app perk redemption with ledger history; verify insufficient-balance and cross-community requests fail, retries do not duplicate entries, and transfers conserve total supply.
-- [ ] 6.7 Build DAO Token balance, reward-history, transfer, and perk-catalog/redemption views; verify published amounts, pending/confirmed states, and rejected operations in UI/API tests.
-- [ ] 6.8 Document milli-token precision, mint authorization, action reward rules, transfer limits, perk terms, and correction procedures; verify documented flows against ledger tests and confirm no external blockchain integration is required.
+- [ ] 6.5 Inventory supported member action events and implement a versioned reward catalog for each qualifying action, including 0.001 RT for one successful login per member/community/UTC day; award one VT for each 100 RT cumulatively earned in that community without consuming RT, and exclude transfer-in from milestone totals; verify action coverage, conversion boundaries, frequency limits, idempotency, and rejection of unconfigured mint requests.
+- [ ] 6.6 Implement atomic same-community RT transfers and non-cash in-app perk redemption with ledger history; verify insufficient-balance and cross-community requests fail, retries do not duplicate entries, and transfers conserve total supply.
+- [ ] 6.7 Build separate CC/WC/RT/VT balances, reward history, RT transfer and perk redemption views, and voting-token eligibility information; verify published amounts, pending/confirmed states, and rejected operations in UI/API tests.
+- [ ] 6.8 Document milli-token precision, RT mint authorization and reward rules, VT milestone conversion, transfer limits, perk terms, and correction procedures; verify documented flows against ledger tests and confirm no external blockchain integration is required.
 
 ## 7. Scheduled AI Operations
 
@@ -65,5 +65,5 @@
 ## 8. Deployment and End-to-End Verification
 
 - [ ] 8.1 Configure staging Pages, Worker routes, D1 bindings, Supabase Auth/Storage, secrets, CORS, and initial community, governance, credit, and schedule values; verify a staging deployment uses no unapproved paid service.
-- [ ] 8.2 Run end-to-end tests for signup, community-scoped listing search, listing moderation appeal, task completion and credit reconciliation, daily login rewards, token transfer and perk redemption, proposal voting/execution, AI run visibility, offline app launch/local reads, bidirectional sync/retry, storage failure, and multi-device conflict resolution; verify supported-browser behavior, desktop/mobile layout, and keyboard accessibility.
+- [ ] 8.2 Run end-to-end tests for signup, community-scoped listing search, listing moderation appeal, task completion and credit reconciliation, daily RT rewards and VT milestones, RT transfer and perk redemption, weighted proposal voting/execution, AI run visibility, offline app launch/local reads, bidirectional sync/retry, storage failure, and multi-device conflict resolution; verify supported-browser behavior, desktop/mobile layout, and keyboard accessibility.
 - [ ] 8.3 Complete operator documentation for Cloudflare Pages/Workers, Supabase setup, schema deployment, AI configuration, backups/exports, quota monitoring, and rollback; verify each setup and rollback command in staging.

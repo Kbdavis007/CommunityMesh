@@ -4,7 +4,7 @@
 
 See proposal.md for motivation. The repository contains no application source, database schema, or capability specs, so this is a greenfield architecture. The requested deployment is provider-hosted: Cloudflare and Supabase remain trusted operators and potential availability or policy dependencies. Their current free-tier quotas, payment-method requirements, model catalog, and terms must be checked before implementation; free operation is a deployment target, not a perpetual availability guarantee.
 
-The behavior contracts are in `specs/community-listings/spec.md`, `specs/community-identity/spec.md`, `specs/dao-governance/spec.md`, `specs/contribution-system/spec.md`, `specs/ai-operations/spec.md`, and `specs/community-experience/spec.md`.
+The behavior contracts are in `specs/community-listings/spec.md`, `specs/community-identity/spec.md`, `specs/dao-governance/spec.md`, `specs/contribution-system/spec.md`, `specs/ai-operations/spec.md`, `specs/offline-sync/spec.md`, and `specs/community-experience/spec.md`.
 
 ## Goals / Non-Goals
 
