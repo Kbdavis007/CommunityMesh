@@ -8,7 +8,7 @@ This note records the current, provider-published limits and conditions for the 
 
 - Cloudflare Workers Free is a real free tier, but it is limited to 100,000 requests/day, 10 ms CPU time per request, 128 MB memory, and low daily quotas for related services. It is not a perpetual no-cost operating model and is subject to provider policy changes.
 - Cloudflare Pages Free is available but limited to 500 builds/month and 20,000 files/site; function traffic counts against Workers quotas.
-- Cloudflare D1 Free includes 5 million rows read/day, 100,000 rows written/day, and 5 GB storage. Usage over these limits is billed, and free quotas are daily account limits.
+- Cloudflare D1 Free includes 5 million rows read/day, 100,000 rows written/day, and 5 GB storage. On Workers Free, daily read/write exhaustion blocks further queries; Workers Paid meters usage above its included allowances.
 - Workers AI currently includes 10,000 Neurons/day at no charge. Above that, AI inference requires Workers Paid and is billed at the current published rate; some models require a paid billing method even within the free allocation.
 - Supabase Free is genuinely free for small projects but strictly bounded: 2 active projects, 500 MB DB, 50,000 MAUs, 1 GB file storage, and 5 GB egress. Free projects can be paused after inactivity and backups are not available for download.
 - The architecture should treat Cloudflare + Supabase as managed providers and not assume provider-independent decentralization or indefinite free operation.
@@ -179,6 +179,77 @@ Before implementation proceeds with production-like AI or paid integrations, con
 
 There is no running application or production telemetry in this repository, so an exact maximum user count cannot yet be measured. The estimates below use published free-plan ceilings and transparent scenarios. They are planning bounds, not a load-test result or a service guarantee.
 
+### Recommended free-tier launch size and activity
+
+For an initial real-world pilot, use a conservative operating target of **100–500 monthly active users (MAU), with about 25–100 daily active users (DAU)**. This is a recommended starting envelope, not a provider-imposed limit. It keeps the expected Worker traffic well below the 100,000-request/day hard cap while the team measures actual image delivery, sync behavior, database growth, and event write amplification.
+
+Suggested pilot budget:
+
+| Measure | Recommended target | How to interpret it |
+| --- | ---: | --- |
+| Monthly active users | 100–500 MAU | Keep well below Supabase Free's 50,000 MAU cap while validating real storage, auth, and egress use. |
+| Daily active users | 25–100 DAU | Pilot activity level; actual MAU/DAU ratio depends on community usage. |
+| Worker API requests | Average 20–40 per DAU/day; 4,000 requests/day target ceiling | At 100 DAU and 40 requests each, that is 4,000 requests/day (4% of Workers Free's 100,000/day). Include search, sync, retries, and image authorization in this count. |
+| Durable D1 business events | Aim for no more than 1,000/day during the pilot | This is a conservative operational budget, not a D1 quota. Track actual D1 rows written per event; at four counted row writes/event, 1,000 events use about 4,000 of 100,000 daily free writes (4%). |
+| AI inference | Start with at most 100 small-model calls/day, shared across agents | This leaves room to learn actual Neurons per call and keeps AI a small part of the 10,000-Neuron daily budget. For the example 500-input/150-output-token Llama 3.2 1B request (~4 Neurons), 100 calls use about 400 Neurons/day. Set a hard account-wide cap and disable/defer AI when reached. |
+| Images | Resize/compress uploads; start with a 250 KB average target and monitor totals | At that average, 1 GB stores about 4,000 images before overhead. Restrict upload size and count, and avoid assuming repeated downloads fit in 5 GB monthly egress. |
+| Headroom | Keep normal usage below 70% of every measured quota | Investigate at 70%, decide on upgrade or reduction by 80%, and degrade nonessential features by 90%; these are recommended internal thresholds, not provider limits. |
+
+**Recommended starting point:** begin around **100–250 MAU and 25–50 DAU**, then raise the pilot cap toward 500 MAU / 100 DAU only after at least several weeks of observed quota, storage, and egress data. The initial limit is intentionally conservative because Supabase's 1 GB image storage and 5 GB egress can be reached much sooner than its 50,000 MAU cap, and no production measurements exist yet.
+
+For usage planning, a “daily active user” should mean a distinct authenticated member who makes at least one meaningful app request that day; exclude static Pages assets, health probes, and scheduled jobs from this product metric, but do include all inbound requests that count against Workers quota in the provider-metered total. Define “business event” separately from API request: a single user action can trigger several API requests and several D1 row writes.
+
+### Activity-based user categories and request budgets
+
+The following model ties the estimate to likely CommunityMesh activities. Counts are **Worker API requests per active day**, not clicks or database rows. They are planning assumptions based on the proposed API boundaries; the implementation may combine or split endpoints. Browser shell assets served by Pages are not included. The counts include login/session checks, search, listing detail, sync, and mutations.
+
+| Activity | Worker requests assumed | Durable-store impact under the planned ownership |
+| --- | ---: | --- |
+| Sign in | 1 | Supabase Auth; no routine D1 write |
+| Load/validate session and own profile | 1 | Supabase Auth/profile read; no routine D1 write |
+| Search one result page | 1 | Supabase query; no routine D1 write |
+| Open one listing detail | 1 | Supabase read; no routine D1 write |
+| Sync one foreground cycle | 2 | Worker sync/download and submit/acknowledge; reads/writes are split across Supabase and D1 by store; changes do not automatically mean one new D1 row |
+| Create a listing with one image | 3 | Listing and image metadata in Supabase; image upload uses short-lived authorized storage access. Image bytes consume Supabase storage/egress, not three Worker calls per image chunk |
+| Submit task evidence | 1 | Task/evidence in Supabase; D1 credit rows are written only after approval/reward processing |
+| Cast a governance vote | 1 | Private ballot in D1; count actual ballot and index row writes using D1 metrics |
+| Approved task reward / ledger award | Usually no extra member request beyond review/approval flow | Cross-store reward processing writes multiple D1 rows (plan for 3–4 rows per award until measured) |
+
+Business-user profiles:
+
+| Business user category | Example activity on an active day | Estimated Worker requests/day | Typical active days/month | Approx. requests/month per active user |
+| --- | --- | ---: | ---: | ---: |
+| **Neighbor / browser** | Sign in + session/profile (2); 4 search pages; open 6 listing details; 1 sync cycle (2) | 14 | 13 (about 3 days/week) | 182 |
+| **Member / listing contributor** | Sign in + session/profile (2); 5 searches; open 8 details; 1 sync cycle (2); create/edit one listing with one image (3); submit one task/profile mutation (2) | 22 | 17 (about 4 days/week) | 374 |
+| **Community organizer / moderator** | Sign in + session/profile (2); 6 searches; open 10 details; 2 sync cycles (4); create/edit two listings (6); perform 8 moderation, task-review, or governance actions; inspect usage/queue (2) | 38 | 22 (about 5 days/week) | 836 |
+
+These categories describe representative activity, not role permissions or hard per-user quotas. An organizer's eight review/governance actions are eight Worker calls in this estimate; a bulk UI or batched endpoint could reduce them. Conversely, retries, pagination, repeated sign-ins, polling, and validation calls can raise request counts. Listing images can dominate storage and egress even though upload bytes are not counted as Worker API requests.
+
+At the **80,000 requests/day planning budget** (20% headroom preserved), a population made entirely of one category would reach the request budget at approximately:
+
+| All active users in this category | Approx. DAU at 80,000 requests/day | Approx. DAU at the 100,000/day hard cap |
+| --- | ---: | ---: |
+| Neighbor / browser (14 requests/day) | 5,714 | 7,143 |
+| Member / listing contributor (22 requests/day) | 3,636 | 4,545 |
+| Community organizer / moderator (38 requests/day) | 2,105 | 2,632 |
+
+Use a **weighted average** for a mixed population, not the sum of the category maxima. Example: if a daily active population is 70% browsers, 25% contributors, and 5% organizers, the estimated average is `0.70 × 14 + 0.25 × 22 + 0.05 × 38 = 17.2` requests/DAU/day. At 80,000 requests/day, the arithmetic ceiling is about **4,651 DAU** for that mix, before storage, egress, CPU, burst, and operational constraints. Apply headroom and set a lower operating target.
+
+The suggested pilot of **25–50 DAU** produces approximately **350–1,900 Worker requests/day** across these profiles (25 organizers at 38 requests = 950; 50 organizers = 1,900), or about **0.35%–1.9%** of the 100,000-request hard cap. It remains a reasonable conservative launch range, but image storage/egress and Supabase pause/backup behavior still need separate monitoring.
+
+### Business events versus API requests
+
+User activities do not map one-to-one to D1 events. Supabase owns Auth, profiles, listings, tasks, and image metadata in this design; routine login, listing search/detail, listing creation, and task evidence therefore do not each create a D1 row. D1 owns governance, policy, credits/ledger, and AI run logs. Budget those separately:
+
+| D1-backed business event | Approximate D1 rows written for planning | Count as |
+| --- | ---: | --- |
+| Governance ballot | 1 ballot row plus any counted index rows; measure with D1 `meta.rows_written` | A governance event, not a generic listing/API event |
+| Approved contribution reward | 3–4 rows initially (ledger entry, balance update, and any related/milestone records); validate actual transaction and indexes | A reward event, only after approval |
+| AI agent run log | At least 1 run record, plus any separately persisted result/affected-record rows | A scheduled AI event, even if no member is online |
+| Listing search/detail | 0 routine D1 writes under current store ownership | API reads against Supabase, plus one Worker request per page/detail |
+
+For example, **1,000 approved reward events/day × 4 D1 rows/event = 4,000 D1 rows written/day**, or 4% of the 100,000 daily free allowance. If the app instead has 10,000 unindexed reads that each scan 500 D1 rows, those reads alone use the 5-million-row daily read allowance. Optimize indexes and inspect D1 metrics; do not estimate D1 activity by counting buttons or users alone.
+
 ### Practical user ceiling
 
 The highest published user-count quota is Supabase's 50,000 monthly active users (MAU), but that is not the effective capacity limit for this design. Cloudflare Workers' daily request cap is likely to bind first for active usage. Supabase egress, database size, and image storage can bind earlier still, depending on how much content each member views or creates.
@@ -191,7 +262,7 @@ For a planning estimate, reserve 20% of the Workers Free daily request allowance
 | 50 | 1,600 | 2,000 |
 | 100 | 800 | 1,000 |
 
-This calculation is `daily request budget / API requests per DAU`. Count each browser-to-Worker request, including sync polling, pagination, search, retries, and image authorization. Batch sync and pagination can materially reduce the count. At 20 requests/day and 30 active days/month, 4,000 DAU would imply about 120,000 monthly active accounts, so Supabase's 50,000 MAU cap would become the lower ceiling; at full daily activity that is at most 50,000 MAU. Real DAU is normally lower than MAU, and the relationship must be measured rather than assumed.
+This calculation is `daily request budget / API requests per DAU`. Count each browser-to-Worker request, including sync polling, pagination, search, retries, and image authorization. Batch sync and pagination can materially reduce the count. DAU does not convert directly to MAU: 4,000 recurring DAU could represent only 4,000 MAU, while 4,000 DAU made up of new or infrequent users could be part of a much larger MAU population. For example, 50,000 MAU with 4,000 DAU at 20 requests/DAU/day would consume about 80,000 requests/day; if all 50,000 were active daily at 20 requests each, that would be 1,000,000 requests/day and exceed Workers Free by 10x. Measure the DAU/MAU ratio and requests per active user.
 
 **Current planning answer:** allow roughly 800–4,000 DAU under the 20% headroom budget for 100–20 Worker API requests per DAU, subject to Supabase's 50,000 MAU and data/egress limits. Do not advertise a guaranteed user capacity until a representative workload has been measured.
 
@@ -240,10 +311,10 @@ The hard transition points are provider limits, not a single common user count:
 
 | Service | Free-tier boundary | Required action |
 | --- | --- | --- |
-| Workers | More than 100,000 requests/day, or endpoints that cannot fit the 10 ms CPU limit | Upgrade to Workers Paid before the expected breach, or rate-limit/degrade nonessential endpoints. Free-plan traffic can fail at the cap. |
-| D1 | More than 5 million rows read/day, 100,000 rows written/day, or 5 GB stored | Upgrade to Workers Paid for metered usage, or reduce queries/data; read/write exhaustion blocks queries on Free. |
-| Workers AI | More than 10,000 Neurons/day, or use of a paid-method-only model | Use Workers Paid and budget for metered inference, or disable/defer AI. Never silently invoke a paid model. |
-| Supabase | More than 50,000 MAU, 500 MB DB/project, 1 GB storage, or 5 GB egress | Upgrade the organization/project to a paid plan, reduce/expire data, or move the affected workload. |
+| Workers | More than 100,000 requests/day, or endpoints that cannot fit the 10 ms CPU limit | Upgrade to Workers Paid before the expected breach, or rate-limit/degrade nonessential endpoints. Workers Paid currently starts at $5/month/account and includes 10 million requests/month; further usage is metered. Free-plan traffic can fail at the cap. |
+| D1 | More than 5 million rows read/day, 100,000 rows written/day, or 5 GB stored | Upgrade to Workers Paid for metered usage, or reduce queries/data; read/write exhaustion blocks queries on Free. Paid currently includes 25 billion rows read/month, 50 million rows written/month, and 5 GB storage, then published per-million/GB rates apply. |
+| Workers AI | More than 10,000 Neurons/day, or use of a paid-method-only model | Use Workers Paid and budget for metered inference, or disable/defer AI. Neurons above the daily free allowance currently cost $0.011 per 1,000. Never silently invoke a paid model. |
+| Supabase | More than 50,000 MAU, 500 MB DB/project, 1 GB storage, or 5 GB egress | Upgrade the organization/project to a paid plan, reduce/expire data, or move the affected workload. Supabase Pro currently starts at $25/month; check the project's compute and usage charges before upgrading. |
 | Supabase availability/recovery | Need to prevent inactivity pause or need downloadable managed backups | Use an appropriate paid plan or arrange and test independent backups before production. |
 | Pages | More than 500 builds/month, >20,000 site files, or other free asset limits | Reduce build churn/assets or move to the plan that supports the requirement. |
 
@@ -251,7 +322,7 @@ Recommended internal thresholds (not provider limits): alert at 70% of a quota, 
 
 ## Provider-usage dashboard in the CommunityMesh UI
 
-Yes. The planned application can include a restricted **Admin → Operations → Usage** dashboard. This repository is currently a greenfield OpenSpec plan with no running UI or telemetry, so this is an implementation design rather than an existing feature.
+Yes. The planned application can include a restricted **Deployment Operations → Usage** dashboard. Access should use a deployment-operator role separate from community-scoped Admin roles, because provider metrics are account-wide. This repository is currently a greenfield OpenSpec plan with no running UI or telemetry, so this is an implementation design rather than an existing feature.
 
 Recommended dashboard cards:
 
