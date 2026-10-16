@@ -29,7 +29,7 @@ The system MUST let an assigned contributor submit completion evidence and MUST 
 - **THEN** the system records the reason, leaves the task incomplete, and does not award completion-based Work Credits
 
 ### Requirement: Credit awards follow published rules
-The system MUST maintain separate Contribution Credit, Work Credit, and DAO Token balances and identify the published rule that authorizes each award.
+The system MUST maintain separate Contribution Credit, Work Credit, Reward Token, and Voting Token balances and identify the published rule or milestone that authorizes each award.
 
 #### Scenario: Award an eligible contribution
 - **WHEN** a qualifying activity satisfies a published award rule
@@ -44,43 +44,54 @@ The system MUST define a versioned reward rule for each qualifying member action
 
 #### Scenario: Reward a qualifying login
 - **WHEN** a member successfully logs in for the first time in a UTC day for a community
-- **THEN** the system awards 0.001 DAO Tokens under the published login rule
+- **THEN** the system awards 0.001 Reward Tokens under the published login rule
 
 #### Scenario: Repeat login within the reward window
 - **WHEN** the same member logs in again in the same UTC day for that community
 - **THEN** the system creates no second login reward
 
 #### Scenario: Reward verified task completion
-- **WHEN** an authorized reviewer approves a task with a published token reward
-- **THEN** the system awards the configured Work Credits and DAO Tokens exactly once
+- **WHEN** an authorized reviewer approves a task with a published Reward Token rule
+- **THEN** the system awards the configured Work Credits and Reward Tokens exactly once
 
-### Requirement: DAO Tokens are minted only through authorized rules
-The system MUST mint DAO Token units only through server-authorized processing of published, versioned reward rules and MUST reject direct member requests to mint tokens.
+### Requirement: Reward Tokens are minted only through authorized rules
+The system MUST mint Reward Tokens only through server-authorized processing of published, versioned reward rules and MUST reject direct member requests to mint tokens.
 
 #### Scenario: Apply an authorized token reward
-- **WHEN** a qualifying action is accepted and its published reward rule authorizes DAO Tokens
+- **WHEN** a qualifying action is accepted and its published reward rule authorizes Reward Tokens
 - **THEN** the system appends a mint entry identifying the rule, member, amount, and source action
 
 #### Scenario: Member requests arbitrary minting
 - **WHEN** a member requests a token amount without an eligible source action and published rule
 - **THEN** the system rejects the request and leaves token balances unchanged
 
-### Requirement: Members can transfer DAO Tokens within their community
-The system MUST let an authenticated member transfer available DAO Tokens to another member of the same community as one idempotent operation that cannot create a negative balance.
+### Requirement: Earned Reward Tokens grant Voting Token milestones
+For each 100 Reward Tokens earned through published action rules in a community, the system MUST grant one non-transferable Voting Token for that community without consuming the Reward Tokens.
+
+#### Scenario: Cross a Voting Token milestone
+- **WHEN** a member's cumulative eligible Reward Token earnings in a community reach another complete 100-token milestone
+- **THEN** the system grants one additional Voting Token and preserves the member's Reward Token balance
+
+#### Scenario: Transfer-in does not count toward a milestone
+- **WHEN** a member receives Reward Tokens from another member
+- **THEN** the received amount does not increase cumulative earned Reward Tokens or grant Voting Tokens
+
+### Requirement: Members can transfer Reward Tokens within their community
+The system MUST let an authenticated member transfer available Reward Tokens to another member of the same community as one idempotent operation that cannot create a negative balance.
 
 #### Scenario: Complete a token transfer
-- **WHEN** a member transfers a valid amount to another member in the same community
+- **WHEN** a member transfers a valid Reward Token amount to another member in the same community
 - **THEN** the system atomically debits the sender, credits the recipient, and records the transfer once
 
 #### Scenario: Reject an invalid transfer
 - **WHEN** a transfer exceeds the sender's available balance or targets a member outside the community
 - **THEN** the system rejects the transfer without changing either balance
 
-### Requirement: Members can redeem DAO Tokens for in-app perks
-The system MUST let members spend DAO Tokens on active, published, non-cash in-app perks and MUST record each redemption without representing it as payment for external goods or services.
+### Requirement: Members can redeem Reward Tokens for in-app perks
+The system MUST let members spend Reward Tokens on active, published, non-cash in-app perks and MUST record each redemption without representing it as payment for external goods or services.
 
 #### Scenario: Redeem an available perk
-- **WHEN** a member redeems an active perk with sufficient DAO Tokens
+- **WHEN** a member redeems an active perk with sufficient Reward Tokens
 - **THEN** the system debits the required amount once and records the perk and fulfillment state
 
 #### Scenario: Reject an unavailable or unaffordable perk
@@ -99,12 +110,12 @@ The system MUST preserve an append-only history of credit changes and MUST apply
 - **THEN** the system shows each balance separately with its award or adjustment reason and source
 
 ### Requirement: Credits are not represented as money
-The system MUST identify Contribution Credits and Work Credits as non-transferable platform records and DAO Tokens as an internal, non-cash app token; none may be represented as fiat, an external blockchain asset, or guaranteed financial value.
+The system MUST identify Contribution Credits and Work Credits as non-transferable platform records, Reward Tokens as a non-cash app token for published transfers and perks, and Voting Tokens as non-transferable units used only for governance voting; none may be represented as fiat, an external blockchain asset, or guaranteed financial value.
 
 #### Scenario: View a credit balance
 - **WHEN** a member views a credit balance
 - **THEN** the system identifies its type and displays the applicable earning, transfer, or redemption rules without implying monetary value
 
-#### Scenario: Use DAO Tokens
-- **WHEN** a member transfers or redeems DAO Tokens
-- **THEN** the system permits only the published in-app uses and does not offer cash or external-chain withdrawal
+#### Scenario: Use Reward or Voting Tokens
+- **WHEN** a member transfers or redeems Reward Tokens, or uses Voting Tokens in governance
+- **THEN** the system permits only the published in-app use for that token type and does not offer cash or external-chain withdrawal

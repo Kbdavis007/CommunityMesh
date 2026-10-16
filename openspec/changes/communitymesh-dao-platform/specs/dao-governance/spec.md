@@ -17,19 +17,23 @@ Eligible members MUST be able to submit a proposal with a description, requested
 - **WHEN** a proposal omits required content or uses an invalid voting period
 - **THEN** the system rejects it with validation details and creates no active proposal
 
-### Requirement: Proposal votes use one-member-one-vote
-The system MUST accept at most one vote per eligible member per proposal, without weighting votes by DAO Token or credit balances.
+### Requirement: Voting Token balances determine proposal voting power
+The system MUST accept one ballot per eligible member per proposal and weight it by that member's Voting Token balance snapshotted when voting opens; Reward Tokens, Contribution Credits, and Work Credits MUST NOT add voting power.
 
-#### Scenario: Eligible member votes
-- **WHEN** an eligible member casts a vote during the proposal's voting period
-- **THEN** the system records one vote for that member and proposal
+#### Scenario: Member votes with snapshotted Voting Tokens
+- **WHEN** an eligible member with three snapshotted Voting Tokens casts a ballot during the voting period
+- **THEN** the system records one ballot with a voting weight of three
+
+#### Scenario: Voting Token balance changes after voting opens
+- **WHEN** a member earns additional Voting Tokens after a proposal's voting period opens
+- **THEN** those tokens do not change the member's voting weight for that proposal
 
 #### Scenario: Duplicate or late vote
-- **WHEN** a member attempts to vote a second time or after the voting period closes
+- **WHEN** a member attempts to cast a second ballot or vote after the voting period closes
 - **THEN** the system rejects the vote and preserves the existing tally
 
 ### Requirement: Proposal outcomes follow published governance rules
-The system MUST calculate quorum and approval using the rule values recorded when voting opens and MUST expose the resulting tally and outcome.
+The system MUST snapshot the community's eligible Voting Token supply and quorum/approval rules when voting opens, calculate quorum against that supply and approval against non-abstaining ballot weight, and expose the resulting weighted tally and outcome.
 
 #### Scenario: Proposal passes
 - **WHEN** voting closes and the proposal meets its recorded quorum and approval thresholds
@@ -38,6 +42,10 @@ The system MUST calculate quorum and approval using the rule values recorded whe
 #### Scenario: Proposal fails quorum or approval
 - **WHEN** voting closes and the proposal misses either recorded threshold
 - **THEN** the system marks the proposal failed and does not execute its requested action
+
+#### Scenario: Tally weighted votes
+- **WHEN** voting closes after members cast ballots with different snapshotted Voting Token balances
+- **THEN** the system calculates quorum and approval from the recorded token weights rather than ballot count
 
 ### Requirement: Proposal execution is authorized and auditable
 The system MUST execute a passed proposal at most once and MUST record its execution result in the public governance history.
