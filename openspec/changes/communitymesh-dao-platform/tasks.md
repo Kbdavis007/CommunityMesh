@@ -3,13 +3,13 @@
 ## 1. Provider and Project Foundations
 
 - [ ] 1.1 Verify current Cloudflare and Supabase payment-method requirements, free-tier quotas, and Cloudflare AI model availability for the intended deployment; record dated sources in deployment notes and stop for a user decision if a required service cannot meet the no-payment constraint.
-- [ ] 1.2 Scaffold the React/Vite/TypeScript client with Tailwind CSS, an installable PWA manifest, versioned service-worker app-shell caching, and build/lint/test scripts; verify installation metadata, offline shell startup, and a production build.
-- [ ] 1.3 Scaffold the Cloudflare Worker API with typed environment bindings, local development configuration, and a versioned health route; verify the route with a Worker test.
-- [ ] 1.4 Define the route map and component hierarchy for home, local hub, listing search/detail/create, profile, contributor tasks, governance, and AI activity; verify route navigation and not-found behavior in client tests and document the hierarchy.
+- [x] 1.2 Scaffold the React/Vite/TypeScript client with Tailwind CSS, an installable PWA manifest, versioned service-worker app-shell caching, and build/lint/test scripts; verify installation metadata, offline shell startup, and a production build.
+- [x] 1.3 Scaffold the Cloudflare Worker API with typed environment bindings, local development configuration, and a versioned health route; verify the route with a Worker test.
+- [x] 1.4 Define the route map and component hierarchy for home, local hub, listing search/detail/create, profile, contributor tasks, governance, and AI activity; verify route navigation and not-found behavior in client tests and document the hierarchy.
 
 ## 2. Persistence and Data Contracts
 
-- [ ] 2.1 Add versioned Supabase SQL migrations for profiles, communities, membership, the six listing categories, listing images, tasks, and the task-completion outbox; verify migrations apply cleanly and constraints/search indexes with database tests.
+- [x] 2.1 Add versioned Supabase SQL migrations for profiles, communities, membership, the six listing categories, listing images, tasks, and the task-completion outbox; verify migrations apply cleanly and constraints/search indexes with database tests.
 - [ ] 2.2 Add versioned D1 migrations for proposals, private ballots and VT snapshots, governance execution history, versioned community policy, CC/WC balances, RT/VT balances in configured integer subunits, cumulative earned-RT milestones, RT mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, policy-version constraints, idempotency, and indexes with D1 migration tests.
 - [ ] 2.3 Document schema ownership, migration commands, required Cloudflare bindings, and Supabase configuration; verify setup steps against a clean development environment.
 - [ ] 2.4 Add versioned IndexedDB schemas for scoped cached records, account-partitioned pending operations, per-source sync cursors, and unresolved conflicts; verify transactional writes, schema upgrade, and storage-failure behavior in browser tests.

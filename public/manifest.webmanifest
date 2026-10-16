@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "CommunityMesh",
+  "short_name": "CommunityMesh",
+  "description": "A community space for sharing resources and coordinating local work.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#153b35",
+  "icons": [
+    {
+      "src": "/icons/communitymesh.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
