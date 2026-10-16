@@ -53,3 +53,7 @@ The system MUST assign Admin permissions to a specific community and MUST allow 
 #### Scenario: Bootstrap initial community Admin
 - **WHEN** deployment configuration assigns an initial Admin to a community
 - **THEN** the system grants Admin permissions only for that community and records the assignment
+
+#### Scenario: Change Admin assignment after bootstrap
+- **WHEN** a request attempts to grant or revoke a community Admin role after bootstrap
+- **THEN** the system applies the change only when authorized by an approved community governance action

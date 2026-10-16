@@ -10,14 +10,14 @@
 ## 2. Persistence and Data Contracts
 
 - [ ] 2.1 Add versioned Supabase SQL migrations for profiles, communities, membership, the six listing categories, listing images, tasks, and the task-completion outbox; verify migrations apply cleanly and constraints/search indexes with database tests.
-- [ ] 2.2 Add versioned D1 migrations for proposals, private ballots and VT snapshots, governance execution history, CC/WC balances, integer milli-RT/milli-VT balances, cumulative earned-RT milestones, RT mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, idempotency constraints, and indexes with D1 migration tests.
+- [ ] 2.2 Add versioned D1 migrations for proposals, private ballots and VT snapshots, governance execution history, versioned community policy, CC/WC balances, RT/VT balances in configured integer subunits, cumulative earned-RT milestones, RT mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, policy-version constraints, idempotency, and indexes with D1 migration tests.
 - [ ] 2.3 Document schema ownership, migration commands, required Cloudflare bindings, and Supabase configuration; verify setup steps against a clean development environment.
 - [ ] 2.4 Add versioned IndexedDB schemas for scoped cached records, account-partitioned pending operations, per-source sync cursors, and unresolved conflicts; verify transactional writes, schema upgrade, and storage-failure behavior in browser tests.
 - [ ] 2.5 Add version/revision metadata, per-store incremental change feeds, and deletion tombstones for synchronized Supabase and D1 records; verify cursor pagination returns changes without gaps or duplicate application.
 
 ## 3. Identity and Listing Services
 
-- [ ] 3.1 Implement Worker-mediated Supabase Auth flows and secure HttpOnly session cookies with role and community authorization; verify unauthenticated requests fail, valid member requests pass, and tokens are absent from browser-managed record storage.
+- [ ] 3.1 Implement Worker-mediated Supabase Auth flows, secure HttpOnly session cookies, community-scoped member/Admin roles, and deployment-configured initial Admin assignment; verify unauthorized or cross-community Admin requests fail and tokens are absent from browser-managed record storage.
 - [ ] 3.2 Implement profile read/update and privacy-filtered trust activity endpoints; verify private fields are omitted for other members and profile tests pass.
 - [ ] 3.3 Implement listing create/edit/archive, community-scoped full-text search and category filters for all six categories; verify validation, ownership, active-state, and cross-community isolation cases with API tests.
 - [ ] 3.4 Implement authorized image upload and listing image association with configured type and size limits; verify invalid and unauthorized uploads are rejected and document the upload flow.
@@ -41,6 +41,9 @@
 - [ ] 5.2 Implement quorum and approval tallying against snapshotted VT supply and weighted ballots, public aggregate history, and an allowlisted idempotent execution registry; verify pass, fail, unsupported-action, and repeated-execution scenarios.
 - [ ] 5.3 Build proposal, weighted voting, outcome, and governance-history views with AI summaries clearly marked as advisory; verify displayed VT weight, one-ballot-per-member behavior, and aggregate-only public results in UI/API integration tests.
 - [ ] 5.4 Document governance eligibility, VT conversion and snapshot rules, weighted threshold configuration, execution handlers, and operational review; verify examples match the implemented governance tests.
+- [ ] 5.5 Build a community Admin policy editor for reward actions, eligibility/frequency limits, RT-to-VT conversion, perk prices, and governance thresholds; verify all values are editable, validated, community-scoped, and submitted as proposals rather than activated directly.
+- [ ] 5.6 Implement community-vote approval and version activation for policy proposals; verify pending, rejected, and invalid proposals leave active configuration unchanged, while passed proposals activate atomically under the rules that were active when voting opened.
+- [ ] 5.7 Implement community-governed Admin role grants and revocations after deployment bootstrap; verify no Admin can directly grant or revoke roles without an approved governance action.
 
 ## 6. Contributor Tasks and Credits
 
@@ -48,10 +51,10 @@
 - [ ] 6.2 Implement transactional Supabase completion-outbox delivery to the D1 ledger, separate CC/WC/RT/VT balances, task reward minting, compensating adjustments, and scheduled reconciliation; verify retries and injected delivery failures produce at most one award.
 - [ ] 6.3 Build contributor task and credit-history views with distinct non-monetary balances and pending award state; verify award status and history rendering with UI/API integration tests.
 - [ ] 6.4 Document task review, award configuration, outbox recovery, and ledger reconciliation; verify the documented recovery procedure against a simulated failed delivery.
-- [ ] 6.5 Inventory supported member action events and implement a versioned reward catalog for each qualifying action, including 0.001 RT for one successful login per member/community/UTC day; award one VT for each 100 RT cumulatively earned in that community without consuming RT, and exclude transfer-in from milestone totals; verify action coverage, conversion boundaries, frequency limits, idempotency, and rejection of unconfigured mint requests.
+- [ ] 6.5 Inventory supported member action events and implement versioned, community-configured reward rules and RT-to-VT conversion; verify action coverage, configurable amounts/limits/ratios, conversion boundaries, idempotency, and rejection of unconfigured mint requests without relying on source-code economic constants.
 - [ ] 6.6 Implement atomic same-community RT transfers and non-cash in-app perk redemption with ledger history; verify insufficient-balance and cross-community requests fail, retries do not duplicate entries, and transfers conserve total supply.
 - [ ] 6.7 Build separate CC/WC/RT/VT balances, reward history, RT transfer and perk redemption views, and voting-token eligibility information; verify published amounts, pending/confirmed states, and rejected operations in UI/API tests.
-- [ ] 6.8 Document milli-token precision, RT mint authorization and reward rules, VT milestone conversion, transfer limits, perk terms, and correction procedures; verify documented flows against ledger tests and confirm no external blockchain integration is required.
+- [ ] 6.8 Document ledger-unit precision/versioning, RT mint authorization and configurable reward rules, VT conversion policy, transfer limits, perk terms, and correction procedures; verify documented flows against ledger tests and confirm no external blockchain integration is required.
 
 ## 7. Scheduled AI Operations
 
@@ -64,6 +67,6 @@
 
 ## 8. Deployment and End-to-End Verification
 
-- [ ] 8.1 Configure staging Pages, Worker routes, D1 bindings, Supabase Auth/Storage, secrets, CORS, and initial community, governance, credit, and schedule values; verify a staging deployment uses no unapproved paid service.
-- [ ] 8.2 Run end-to-end tests for signup, community-scoped listing search, listing moderation appeal, task completion and credit reconciliation, daily RT rewards and VT milestones, RT transfer and perk redemption, weighted proposal voting/execution, AI run visibility, offline app launch/local reads, bidirectional sync/retry, storage failure, and multi-device conflict resolution; verify supported-browser behavior, desktop/mobile layout, and keyboard accessibility.
+- [ ] 8.1 Configure staging Pages, Worker routes, D1 bindings, Supabase Auth/Storage, secrets, CORS, bootstrap Admin assignments, and complete initial community policy values; verify staging contains no source-coded economic defaults and uses no unapproved paid service.
+- [ ] 8.2 Run end-to-end tests for signup, community-scoped listing search, listing moderation appeal, task completion and credit reconciliation, configured RT rewards and VT conversion, Admin policy proposal/approval/rejection, RT transfer and perk redemption, weighted proposal voting/execution, AI run visibility, offline app launch/local reads, bidirectional sync/retry, storage failure, and multi-device conflict resolution; verify supported-browser behavior, desktop/mobile layout, and keyboard accessibility.
 - [ ] 8.3 Complete operator documentation for Cloudflare Pages/Workers, Supabase setup, schema deployment, AI configuration, backups/exports, quota monitoring, and rollback; verify each setup and rollback command in staging.
