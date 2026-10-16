@@ -17,6 +17,25 @@ Eligible members MUST be able to submit a proposal with a description, requested
 - **WHEN** a proposal omits required content or uses an invalid voting period
 - **THEN** the system rejects it with validation details and creates no active proposal
 
+### Requirement: Community Admins submit configurable policy changes for a vote
+The system MUST let a community Admin submit a versioned policy proposal for community vote, including proposed reward rules, activity limits, Reward-to-Voting Token conversion, perk prices, and governance thresholds; Admin submission MUST NOT activate the policy.
+
+#### Scenario: Admin submits a complete policy proposal
+- **WHEN** an Admin submits a valid policy version for the community they administer
+- **THEN** the system records it as a governance proposal and leaves the currently active policy unchanged
+
+#### Scenario: Policy proposal fails or remains pending
+- **WHEN** a policy proposal has not passed its community vote
+- **THEN** the system continues applying the current active policy
+
+#### Scenario: Community approves a policy proposal
+- **WHEN** a policy proposal passes under the active snapshotted governance rules
+- **THEN** the system activates the approved version, records its effective time and authorizing vote, and uses it for subsequent actions
+
+#### Scenario: Reject hard-coded or incomplete policy input
+- **WHEN** an Admin submits invalid policy values or omits a required configurable field
+- **THEN** the system rejects the proposal with field-level validation and leaves active policy unchanged
+
 ### Requirement: Voting Token balances determine proposal voting power
 The system MUST accept one ballot per eligible member per proposal and weight it by that member's Voting Token balance snapshotted when voting opens; Reward Tokens, Contribution Credits, and Work Credits MUST NOT add voting power.
 

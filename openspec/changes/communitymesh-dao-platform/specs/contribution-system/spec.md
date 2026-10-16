@@ -43,11 +43,11 @@ The system MUST maintain separate Contribution Credit, Work Credit, Reward Token
 The system MUST define a versioned reward rule for each qualifying member action, including its credit type, amount, eligibility, frequency limit, and source event, and MUST apply an eligible reward no more than once per source event.
 
 #### Scenario: Reward a qualifying login
-- **WHEN** a member successfully logs in for the first time in a UTC day for a community
-- **THEN** the system awards 0.001 Reward Tokens under the published login rule
+- **WHEN** a member successfully logs in within the active login reward window for a community
+- **THEN** the system awards the amount and credit type defined by that community's active login rule
 
 #### Scenario: Repeat login within the reward window
-- **WHEN** the same member logs in again in the same UTC day for that community
+- **WHEN** the same member logs in again before the active login reward window has elapsed
 - **THEN** the system creates no second login reward
 
 #### Scenario: Reward verified task completion
@@ -66,15 +66,26 @@ The system MUST mint Reward Tokens only through server-authorized processing of 
 - **THEN** the system rejects the request and leaves token balances unchanged
 
 ### Requirement: Earned Reward Tokens grant Voting Token milestones
-For each 100 Reward Tokens earned through published action rules in a community, the system MUST grant one non-transferable Voting Token for that community without consuming the Reward Tokens.
+The system MUST grant non-transferable Voting Tokens according to the active, community-approved conversion policy applied to cumulative qualifying Reward Tokens earned in that community, without consuming the Reward Tokens.
 
 #### Scenario: Cross a Voting Token milestone
-- **WHEN** a member's cumulative eligible Reward Token earnings in a community reach another complete 100-token milestone
-- **THEN** the system grants one additional Voting Token and preserves the member's Reward Token balance
+- **WHEN** a member's cumulative eligible Reward Token earnings reach a threshold in the active conversion policy
+- **THEN** the system grants the configured Voting Token amount and preserves the member's Reward Token balance
 
 #### Scenario: Transfer-in does not count toward a milestone
 - **WHEN** a member receives Reward Tokens from another member
 - **THEN** the received amount does not increase cumulative earned Reward Tokens or grant Voting Tokens
+
+### Requirement: Token economy values come from active community policy
+The system MUST use the active, versioned community policy for action reward amounts and limits, Reward-to-Voting Token conversion, and perk prices rather than embedding economic values in application behavior.
+
+#### Scenario: Apply a community-approved policy
+- **WHEN** a qualifying action or perk redemption is processed
+- **THEN** the system uses the active policy version for that member's community and records the version with the ledger event
+
+#### Scenario: Proposed policy has not passed
+- **WHEN** an Admin submits a policy change that has not been approved by the community
+- **THEN** the system continues to use the previously active policy
 
 ### Requirement: Members can transfer Reward Tokens within their community
 The system MUST let an authenticated member transfer available Reward Tokens to another member of the same community as one idempotent operation that cannot create a negative balance.

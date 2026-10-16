@@ -38,3 +38,18 @@ The system MUST present trust or reputation information with its contributing ac
 #### Scenario: No contribution history
 - **WHEN** a profile has no eligible contribution history
 - **THEN** the system presents no reputation score or identifies the profile as having insufficient history
+
+### Requirement: Community Admin permissions are scoped and explicit
+The system MUST assign Admin permissions to a specific community and MUST allow that community's Admin to prepare policy proposals without directly activating policy changes.
+
+#### Scenario: Community Admin prepares a policy proposal
+- **WHEN** an authenticated Admin submits a policy proposal for a community they administer
+- **THEN** the system accepts it for community governance review and does not change the active policy
+
+#### Scenario: Member or unrelated Admin submits policy
+- **WHEN** a member without Admin permission or an Admin from another community attempts to submit a community policy proposal
+- **THEN** the system rejects the request without changing policy
+
+#### Scenario: Bootstrap initial community Admin
+- **WHEN** deployment configuration assigns an initial Admin to a community
+- **THEN** the system grants Admin permissions only for that community and records the assignment
