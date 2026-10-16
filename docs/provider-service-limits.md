@@ -118,10 +118,11 @@ Operational caveats in the provider docs:
 
 Important account and payment requirements:
 
-- Supabase offers Free, Pro, Team, and Enterprise plans.
-- Supabase Free requires no payment to start, but the platform clearly documents inactivity pauses and hard limits.
-- Paid plans add higher quotas and more production-grade operational features, including backups, higher storage, and higher limits.
-- The design should assume that a production or higher-traffic launch may require a paid plan or billing arrangement, even if the initial pilot is within free limits.
+- Cloudflare's Workers pricing page says users have access to the Workers Free plan by default; Workers Paid starts at $5/month/account. The public pricing page does not state a universal payment-method requirement for every account's free-plan provisioning.
+- Supabase's pricing and billing pages list a $0 Free plan and two active projects. Those public pages do not establish a universal credit-card/payment-method rule for every signup or account. Verify the actual Cloudflare and Supabase account flows before deployment rather than promising that no payment method will be requested.
+- Workers AI's pricing page lists 10,000 Neurons/day at no charge; use above that requires Workers Paid. Some named frontier models require a paid billing method. `@cf/meta/llama-3.2-1b-instruct` has a current model documentation page and is not among the paid-method-only exceptions listed on the pricing page. The Llama 3.1 8B Fast model documentation URL returned 404 on this verification date, although its identifier remains in the pricing table; do not rely on it without a successful account/model-catalog check.
+- Supabase Free is a viable no-cost pilot option within its limits, but it does not satisfy a requirement for guaranteed continuous availability or downloadable provider-managed backups: projects with low activity may be paused after seven days, and Free projects have no downloadable database backups. If either capability is required for production, a paid plan or a different architecture is needed.
+- All provider details above were checked on 2026-10-16. A free plan is not a guarantee that an account will never be asked for payment information, or that the service will remain available or free indefinitely.
 
 ## Privacy and governance constraints
 
@@ -167,6 +168,7 @@ These are not edge conditions; they are part of the current free-plan operating 
 - Cloudflare D1 pricing: https://developers.cloudflare.com/d1/platform/pricing/
 - Cloudflare Workers AI pricing: https://developers.cloudflare.com/workers-ai/platform/pricing/
 - Cloudflare Workers AI models: https://developers.cloudflare.com/workers-ai/models/
+- Cloudflare Llama 3.2 1B model documentation: https://developers.cloudflare.com/workers-ai/models/llama-3.2-1b-instruct/
 - Supabase pricing: https://supabase.com/pricing
 - Supabase billing: https://supabase.com/docs/guides/platform/billing-on-supabase
 - Supabase production guidance: https://supabase.com/docs/guides/platform/going-into-prod
