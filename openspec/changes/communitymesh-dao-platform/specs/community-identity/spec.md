@@ -28,17 +28,6 @@ The system MUST let members view and update their profile information and MUST N
 - **WHEN** a member views another member's profile
 - **THEN** the system returns public profile fields and omits private fields
 
-### Requirement: Profile media preserves Supabase access controls
-The system MUST keep avatars, identity-verification images, and private user-specific media in Supabase Storage and MUST proxy profile-image delivery through Cloudflare without weakening Supabase access rules.
-
-#### Scenario: Deliver a visible profile image
-- **WHEN** a visitor requests a profile image that the profile's visibility settings allow them to view
-- **THEN** Cloudflare delivers the image through the proxy using a cache policy permitted for that visibility
-
-#### Scenario: Deny protected profile media
-- **WHEN** a requester lacks permission to view an identity-verification image or other private media
-- **THEN** the proxy denies access and does not place the media in a shared cache
-
 ### Requirement: Trust and reputation are explainable
 The system MUST present trust or reputation information with its contributing activity and MUST NOT imply that it is a verified measure of a person's character.
 
