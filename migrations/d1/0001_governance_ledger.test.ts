@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 const migrations = [
   "0001_governance_ledger.sql",
   "0002_sync_change_feed.sql",
+  "0003_coding_task_fleet.sql",
 ].map((name) =>
   readFileSync(resolve(process.cwd(), "migrations/d1", name), "utf8"),
 );
@@ -19,7 +20,67 @@ describe("D1 governance and ledger migration", () => {
     return database;
   }
 
-  it("creates policy, governance, ledger, and AI tables and indexes", () => {
+  function insertProfile(
+    database: DatabaseSync,
+    scopeKind: "platform" | "hub",
+    scopeId: string,
+    profileId = "agent-feature",
+    status: "draft" | "approved" | "revoked" = "approved",
+  ) {
+    const profileJson = JSON.stringify({
+      ...(scopeKind === "hub"
+        ? { baselineProfile: { profileId: "agent-baseline", version: 1 } }
+        : {}),
+      taskTypes: ["feature_impl"],
+      requiredSkills: [],
+      allowedRepositoryPaths: ["src/**"],
+      allowedSpecPaths: ["openspec/**"],
+      allowedOperations: ["read", "write", "run_tests", "openspec_validate", "create_branch"],
+      resourceLimits: {
+        maxTokens: 10000,
+        maxFiles: 10,
+        maxDurationSeconds: 1800,
+        maxDiffBytes: 250000,
+      },
+    });
+    database.prepare(`
+      insert into coding_agent_profiles (
+        scope_kind, scope_id, profile_id, version, profile_json, status, created_by
+      ) values (?, ?, ?, 1, ?, ?, 'test')
+    `).run(scopeKind, scopeId, profileId, profileJson, status);
+  }
+
+  function insertTask(
+    database: DatabaseSync,
+    taskId: string,
+    hubId = "hub-a",
+    idempotencyKey = taskId,
+    profileScopeKind: "platform" | "hub" = "platform",
+    profileScopeId = "platform",
+    profileId = "agent-feature",
+  ) {
+    database.prepare(`
+      insert into coding_task_records (
+        task_id, hub_id, project_id, repository, base_branch, producer_id,
+        requested_by, source_request_id, idempotency_key, request_digest,
+        specialization, priority,
+        profile_scope_kind, profile_scope_id, profile_id, profile_version,
+        spec_paths_json
+      ) values (?, ?, 'repo', 'communitymesh/repo', 'main', 'producer',
+        'user-1', ?, ?, 'sha256:digest', 'feature_impl', 50, ?, ?, ?, 1,
+        '["openspec/changes/feature/spec.md"]')
+    `).run(
+      taskId,
+      hubId,
+      taskId,
+      idempotencyKey,
+      profileScopeKind,
+      profileScopeId,
+      profileId,
+    );
+  }
+
+  it("creates policy, governance, coding fleet, ledger, and AI tables and indexes", () => {
     const database = createDatabase();
     const tables = database
       .prepare("select name from sqlite_master where type = 'table' order by name")
@@ -33,6 +94,21 @@ describe("D1 governance and ledger migration", () => {
     expect(tables.map(({ name }) => name)).toContain("ai_run_logs");
     expect(tables.map(({ name }) => name)).toContain("sync_change_counters");
     expect(tables.map(({ name }) => name)).toContain("sync_change_feed");
+    expect(tables.map(({ name }) => name)).toEqual(
+      expect.arrayContaining([
+        "coding_agent_profiles",
+        "coding_skill_versions",
+        "coding_task_records",
+        "coding_task_payloads",
+        "coding_task_skills",
+        "coding_task_attempts",
+        "coding_task_events",
+        "coding_audit_events",
+        "coding_quota_policies",
+        "coding_quota_reservations",
+        "coding_worker_health_policies",
+      ]),
+    );
     expect(indexes.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
         "community_policy_versions_approved_proposal_idx",
@@ -45,8 +121,237 @@ describe("D1 governance and ledger migration", () => {
         "ai_run_logs_agent_history_idx",
         "ai_run_logs_status_started_idx",
         "sync_change_feed_entity_idx",
+        "coding_task_records_status_priority_idx",
+        "coding_task_records_hub_status_idx",
+        "coding_task_attempts_active_task_idx",
+        "coding_task_events_task_idx",
+        "coding_audit_events_task_idx",
+        "coding_task_attempts_health_idx",
+        "coding_quota_reservations_active_idx",
+        "coding_worker_health_policies_scope_idx",
       ]),
     );
+    database.close();
+  });
+
+  it("enforces hub-scoped profile identity and task idempotency", () => {
+    const database = createDatabase();
+    insertProfile(database, "hub", "hub-a");
+    insertProfile(database, "hub", "hub-b");
+    insertTask(database, "task-a1", "hub-a", "request-a", "hub", "hub-a");
+    insertTask(database, "task-b1", "hub-b", "request-a", "hub", "hub-b");
+
+    expect(() =>
+      insertTask(database, "task-a2", "hub-a", "request-a", "hub", "hub-a"),
+    ).toThrow();
+    expect(() =>
+      insertTask(database, "task-a3", "hub-a", "request-b", "hub", "hub-b"),
+    ).toThrow();
+    expect(
+      database
+        .prepare("select hub_id from coding_task_records order by hub_id")
+        .all(),
+    ).toEqual([{ hub_id: "hub-a" }, { hub_id: "hub-b" }]);
+    database.close();
+  });
+
+  it("enforces valid task transitions, monotonic generations, and one active claim", () => {
+    const database = createDatabase();
+    insertProfile(database, "platform", "platform");
+    insertTask(database, "task-state");
+    database.prepare("update coding_task_records set status = 'queued' where task_id = ?")
+      .run("task-state");
+    database.prepare("update coding_task_records set status = 'running' where task_id = ?")
+      .run("task-state");
+    expect(() =>
+      database.prepare("update coding_task_records set status = 'accepted' where task_id = ?")
+        .run("task-state"),
+    ).toThrow(/invalid coding task status transition/);
+    expect(() =>
+      database.prepare("update coding_task_records set assignment_generation = 0 where task_id = ?")
+        .run("task-state"),
+    ).toThrow();
+
+    database.prepare(`
+      insert into coding_task_attempts (
+        attempt_id, task_id, assignment_generation, specialization,
+        profile_scope_kind, profile_scope_id, profile_id, profile_version,
+        worker_id, status
+      ) values (
+        'attempt-1', 'task-state', 1, 'feature_impl',
+        'platform', 'platform', 'agent-feature', 1, 'worker-a', 'claimed'
+      )
+    `).run();
+    expect(() =>
+      database.prepare(`
+        insert into coding_task_attempts (
+          attempt_id, task_id, assignment_generation, specialization,
+          profile_scope_kind, profile_scope_id, profile_id, profile_version,
+          worker_id, status
+        ) values (
+          'attempt-2', 'task-state', 1, 'feature_impl',
+          'platform', 'platform', 'agent-feature', 1, 'worker-b', 'running'
+        )
+      `).run(),
+    ).toThrow();
+    database.prepare("update coding_task_attempts set status = 'abandoned' where attempt_id = ?")
+      .run("attempt-1");
+    database.prepare(`
+      update coding_task_records set assignment_generation = 2 where task_id = ?
+    `).run("task-state");
+    database.prepare(`
+      insert into coding_task_attempts (
+        attempt_id, task_id, assignment_generation, specialization,
+        profile_scope_kind, profile_scope_id, profile_id, profile_version,
+        worker_id, status
+      ) values (
+        'attempt-2', 'task-state', 2, 'feature_impl',
+        'platform', 'platform', 'agent-feature', 1, 'worker-b', 'running'
+      )
+    `).run();
+    database.prepare("update coding_task_records set status = 'succeeded' where task_id = ?")
+      .run("task-state");
+    expect(
+      database.prepare("select status from coding_task_records where task_id = ?")
+        .get("task-state"),
+    ).toEqual({ status: "succeeded" });
+    database.close();
+  });
+
+  it("reserves configured active-task quotas atomically and releases deferred work", () => {
+    const database = createDatabase();
+    insertProfile(database, "platform", "platform");
+    insertTask(database, "quota-task-1", "hub-a");
+    insertTask(database, "quota-task-2", "hub-a");
+    database.prepare(`
+      insert into coding_quota_policies (
+        scope_kind, scope_id, dimension_kind, subject_id, max_active_tasks
+      ) values ('hub', 'hub-a', 'user', 'user-1', 1)
+    `).run();
+
+    const reserve = (taskId: string) =>
+      database.prepare(`
+        insert into coding_quota_reservations (
+          task_id, scope_kind, scope_id, dimension_kind, subject_id
+        )
+        select ?, 'hub', 'hub-a', 'user', 'user-1'
+        where (
+          select count(*) from coding_quota_reservations
+          where scope_kind = 'hub' and scope_id = 'hub-a'
+            and dimension_kind = 'user' and subject_id = 'user-1'
+            and released_at is null
+        ) < (
+          select max_active_tasks from coding_quota_policies
+          where scope_kind = 'hub' and scope_id = 'hub-a'
+            and dimension_kind = 'user' and subject_id = 'user-1'
+        )
+      `).run(taskId).changes;
+
+    expect(reserve("quota-task-1")).toBe(1);
+    expect(reserve("quota-task-2")).toBe(0);
+    database.prepare("update coding_task_records set status = 'deferred' where task_id = ?")
+      .run("quota-task-1");
+    expect(reserve("quota-task-2")).toBe(1);
+    expect(() =>
+      database.prepare(`
+        insert into coding_quota_reservations (
+          task_id, scope_kind, scope_id, dimension_kind, subject_id
+        ) values ('quota-task-2', 'hub', 'hub-b', 'user', 'user-1')
+      `).run(),
+    ).toThrow(/crosses hub scope/);
+    database.close();
+  });
+
+  it("rejects claims against superseded task assignment generations", () => {
+    const database = createDatabase();
+    insertProfile(database, "platform", "platform");
+    insertTask(database, "stale-task");
+    database.prepare(`
+      update coding_task_records
+      set status = 'queued', assignment_generation = 2
+      where task_id = 'stale-task'
+    `).run();
+
+    expect(() => database.prepare(`
+      insert into coding_task_attempts (
+        attempt_id, task_id, assignment_generation, specialization,
+        profile_scope_kind, profile_scope_id, profile_id, profile_version,
+        worker_id, status
+      ) values (
+        'stale-attempt', 'stale-task', 1, 'feature_impl',
+        'platform', 'platform', 'agent-feature', 1, 'worker-a', 'claimed'
+      )
+    `).run()).toThrow(/stale assignment generation/);
+    database.close();
+  });
+
+  it("retains request payloads while active and deletes them after terminal outcomes", () => {
+    const database = createDatabase();
+    insertProfile(database, "platform", "platform");
+    insertTask(database, "task-payload");
+    database.prepare(`
+      insert into coding_task_payloads (task_id, payload_json)
+      values ('task-payload', '{"title":"active request"}')
+    `).run();
+    database.prepare(`
+      update coding_task_records set status = 'queued' where task_id = 'task-payload'
+    `).run();
+    expect(
+      database.prepare(`
+        select count(*) as count from coding_task_payloads where task_id = 'task-payload'
+      `).get(),
+    ).toEqual({ count: 1 });
+    database.prepare(`
+      update coding_task_records set status = 'running' where task_id = 'task-payload'
+    `).run();
+    database.prepare(`
+      update coding_task_records set status = 'succeeded' where task_id = 'task-payload'
+    `).run();
+    expect(
+      database.prepare(`
+        select count(*) as count from coding_task_payloads where task_id = 'task-payload'
+      `).get(),
+    ).toEqual({ count: 0 });
+    database.close();
+  });
+
+  it("binds tasks to approved immutable skill versions within their hub", () => {
+    const database = createDatabase();
+    insertProfile(database, "platform", "platform");
+    insertTask(database, "task-skills", "hub-a");
+    database.prepare(`
+      insert into coding_skill_versions (
+        scope_kind, scope_id, skill_id, version, manifest_json, governance_status, created_by
+      ) values ('hub', 'hub-a', 'spec-reader', 1, '{"capabilities":[]}', 'approved', 'test')
+    `).run();
+    database.prepare(`
+      insert into coding_skill_versions (
+        scope_kind, scope_id, skill_id, version, manifest_json, governance_status, created_by
+      ) values ('hub', 'hub-b', 'spec-reader', 1, '{"capabilities":[]}', 'approved', 'test')
+    `).run();
+    database.prepare(`
+      insert into coding_task_skills (task_id, scope_kind, scope_id, skill_id, version)
+      values ('task-skills', 'hub', 'hub-a', 'spec-reader', 1)
+    `).run();
+
+    expect(() =>
+      database.prepare(`
+        insert into coding_task_skills (task_id, scope_kind, scope_id, skill_id, version)
+        values ('task-skills', 'hub', 'hub-b', 'spec-reader', 1)
+      `).run(),
+    ).toThrow(/not approved for this hub/);
+    expect(() =>
+      database.prepare(`
+        update coding_skill_versions set manifest_json = '{"changed":true}'
+        where scope_id = 'hub-a' and skill_id = 'spec-reader'
+      `).run(),
+    ).toThrow(/immutable/);
+    expect(() =>
+      database.prepare(`
+        delete from coding_skill_versions
+        where scope_id = 'hub-a' and skill_id = 'spec-reader'
+      `).run(),
+    ).toThrow(/cannot be deleted/);
     database.close();
   });
 

@@ -4,6 +4,9 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-10-16",
   "workers_dev": true,
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "observability": {
     "enabled": true
   },
@@ -17,5 +20,41 @@
   ],
   "ai": {
     "binding": "AI"
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "CODING_REQUESTS_QUEUE",
+        "queue": "coding_requests_queue"
+      },
+      {
+        "binding": "CODING_TASKS_QUEUE",
+        "queue": "coding_tasks_queue"
+      },
+      {
+        "binding": "CODING_RESULTS_QUEUE",
+        "queue": "coding_results_queue"
+      },
+      {
+        "binding": "CODING_ALERTS_QUEUE",
+        "queue": "coding_alerts_queue"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "coding_requests_queue",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "coding_alerts_queue"
+      },
+      {
+        "queue": "coding_tasks_queue",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "coding_alerts_queue"
+      }
+    ]
   }
 }

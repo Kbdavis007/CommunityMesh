@@ -2,16 +2,16 @@
 
 ## 1. Cloudflare and D1 Foundations
 
-- [ ] 1.1 Add the four queue bindings, consumer retry/dead-letter policies, and local development configuration; verify Wrangler types generation and local Worker startup recognize every binding.
-- [ ] 1.2 Add additive D1 migrations for task lifecycle, claims, audit events, hub-scoped profiles, and immutable skill versions; verify migration tests cover uniqueness, state transitions, and hub isolation.
-- [ ] 1.3 Reconcile hand-maintained and Wrangler-generated Worker environment types; verify TypeScript build passes and the existing `/api/v1/health` tests remain unchanged.
+- [x] 1.1 Add the four queue bindings, consumer retry/dead-letter policies, and local development configuration; verify Wrangler types generation and local Worker startup recognize every binding.
+- [x] 1.2 Add additive D1 migrations for task lifecycle, claims, audit events, hub-scoped profiles, and immutable skill versions; verify migration tests cover uniqueness, state transitions, and hub isolation.
+- [x] 1.3 Reconcile hand-maintained and Wrangler-generated Worker environment types; verify TypeScript build passes and the existing `/api/v1/health` tests remain unchanged.
 
 ## 2. Request Intake and Boss Orchestration
 
-- [ ] 2.1 Define validated request, task, result, and alert message contracts and authorized queue producer adapters for UI, GitHub, and system requests; verify invalid envelopes are rejected and no worker executes request HTTP traffic.
-- [ ] 2.2 Implement the boss queue consumer to resolve OpenSpec artifacts, specialization, agent profile, required skills, and hub/project attribution before recording and publishing a task; verify valid requests dispatch and unresolved requests emit actionable alerts.
-- [ ] 2.3 Implement priority selection, per-agent/user/project quotas, backlog and worker-health signals, and bounded overload reassignment with assignment generations; verify quota boundaries, deferred work, stale-message rejection, and redelivery do not duplicate tasks.
-- [ ] 2.4 Document request/task lifecycle and operator configuration; verify the documented queue names, state transitions, and quota/reassignment controls match the implemented contracts.
+- [x] 2.1 Define validated request, task, result, and alert message contracts and authorized queue producer adapters for UI, GitHub, and system requests; verify invalid envelopes are rejected and no worker executes request HTTP traffic.
+- [x] 2.2 Implement the boss queue consumer to resolve OpenSpec artifacts, specialization, agent profile, required skills, and hub/project attribution before recording and publishing a task; verify valid requests dispatch and unresolved requests emit actionable alerts.
+- [x] 2.3 Implement priority selection, per-agent/user/project quotas, backlog and worker-health signals, and bounded overload reassignment with assignment generations; verify quota boundaries, deferred work, stale-message rejection, and redelivery do not duplicate tasks.
+- [x] 2.4 Document request/task lifecycle and operator configuration; verify the documented queue names, state transitions, and quota/reassignment controls match the implemented contracts.
 
 ## 3. Agent and Skill Governance
 
