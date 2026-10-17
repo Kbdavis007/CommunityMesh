@@ -117,9 +117,9 @@ as $$
 declare
   source_row jsonb;
   row_revision bigint;
-  scope_kind text := tg_argv[1];
-  scope_id text;
-  entity_id text;
+  feed_scope_kind text := tg_argv[1];
+  feed_scope_id text;
+  feed_entity_id text;
   change_cursor bigint;
   change_type text;
 begin
@@ -133,14 +133,14 @@ begin
     change_type := 'upsert';
   end if;
 
-  scope_id := source_row ->> tg_argv[2];
-  entity_id := source_row ->> tg_argv[3];
+  feed_scope_id := source_row ->> tg_argv[2];
+  feed_entity_id := source_row ->> tg_argv[3];
   if tg_nargs > 4 and tg_argv[4] <> '' then
-    entity_id := entity_id || ':' || (source_row ->> tg_argv[4]);
+    feed_entity_id := feed_entity_id || ':' || (source_row ->> tg_argv[4]);
   end if;
 
   insert into public.sync_change_counters (scope_kind, scope_id, last_cursor)
-  values (scope_kind, scope_id, 1)
+  values (feed_scope_kind, feed_scope_id, 1)
   on conflict (scope_kind, scope_id) do update
     set last_cursor = public.sync_change_counters.last_cursor + 1
   returning last_cursor into change_cursor;
@@ -149,7 +149,7 @@ begin
     scope_kind, scope_id, cursor, entity_type, entity_id,
     revision, change_type
   ) values (
-    scope_kind, scope_id, change_cursor, tg_argv[0], entity_id,
+    feed_scope_kind, feed_scope_id, change_cursor, tg_argv[0], feed_entity_id,
     row_revision, change_type
   );
 
@@ -192,7 +192,7 @@ for each row execute function public.record_sync_change(
 create trigger memberships_record_sync_change
 after insert or update or delete on public.community_memberships
 for each row execute function public.record_sync_change(
-  'membership', 'account', 'user_id', 'community_id'
+  'membership', 'community', 'community_id', 'user_id', 'community_id'
 );
 create trigger listings_record_sync_change
 after insert or update or delete on public.listings

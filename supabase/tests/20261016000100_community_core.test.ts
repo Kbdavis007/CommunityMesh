@@ -247,7 +247,7 @@ describe("community core migration", () => {
     }
     const changes = pages;
 
-    expect(changes.map((change) => change.cursor)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(changes.map((change) => change.cursor)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(new Set(changes.map((change) => change.cursor)).size).toBe(changes.length);
     expect(changes).toEqual(
       expect.arrayContaining([
