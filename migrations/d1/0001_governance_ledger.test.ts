@@ -3,15 +3,19 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 
-const migration = readFileSync(
-  resolve(process.cwd(), "migrations/d1/0001_governance_ledger.sql"),
-  "utf8",
+const migrations = [
+  "0001_governance_ledger.sql",
+  "0002_sync_change_feed.sql",
+].map((name) =>
+  readFileSync(resolve(process.cwd(), "migrations/d1", name), "utf8"),
 );
 
 describe("D1 governance and ledger migration", () => {
   function createDatabase() {
     const database = new DatabaseSync(":memory:");
-    database.exec(migration);
+    for (const migration of migrations) {
+      database.exec(migration);
+    }
     return database;
   }
 
@@ -27,6 +31,8 @@ describe("D1 governance and ledger migration", () => {
     expect(tables.map(({ name }) => name)).toContain("private_proposal_ballots");
     expect(tables.map(({ name }) => name)).toContain("token_ledger_entries");
     expect(tables.map(({ name }) => name)).toContain("ai_run_logs");
+    expect(tables.map(({ name }) => name)).toContain("sync_change_counters");
+    expect(tables.map(({ name }) => name)).toContain("sync_change_feed");
     expect(indexes.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
         "community_policy_versions_approved_proposal_idx",
@@ -38,8 +44,96 @@ describe("D1 governance and ledger migration", () => {
         "token_ledger_source_event_idx",
         "ai_run_logs_agent_history_idx",
         "ai_run_logs_status_started_idx",
+        "sync_change_feed_entity_idx",
       ]),
     );
+    database.close();
+  });
+
+  it("pages per-community changes without gaps after rollback", () => {
+    const database = createDatabase();
+    const completePolicy =
+      '{"rewardRules":[],"rtToVtConversion":{},"perks":[],"governance":{},"tokenUnits":{"rtSubunitsPerToken":100,"vtSubunitsPerToken":1}}';
+    database.exec(`
+      insert into community_policy_versions (
+        community_id, version, policy_json, submitted_by
+      ) values ('community-1', 1, '${completePolicy}', 'member-1');
+      insert into community_policy_versions (
+        community_id, version, policy_json, submitted_by
+      ) values ('community-2', 1, '${completePolicy}', 'member-2');
+      insert into governance_proposals (
+        proposal_id, community_id, proposer_id, title, description,
+        requested_action_json
+      ) values (
+        'proposal-1', 'community-1', 'member-1', 'Test proposal',
+        'Proposal description.', '{}'
+      );
+    `);
+    database.exec("begin");
+    database
+      .prepare(`
+        update governance_proposals
+        set status = 'open', opens_at = '2026-01-01', closes_at = '2026-01-02'
+        where proposal_id = ?
+      `)
+      .run("proposal-1");
+    database.exec("rollback");
+    database
+      .prepare(`
+        update governance_proposals
+        set status = 'open', opens_at = '2026-01-01', closes_at = '2026-01-02'
+        where proposal_id = ?
+      `)
+      .run("proposal-1");
+    database.prepare("delete from governance_proposals where proposal_id = ?").run("proposal-1");
+
+    const readPage = (after: number) =>
+      database
+        .prepare(`
+          select cursor, entity_type, entity_id, revision, change_type
+          from sync_change_feed
+          where scope_kind = 'community' and scope_id = ? and cursor > ?
+          order by cursor
+          limit 2
+        `)
+        .all("community-1", after) as Array<{
+        cursor: number;
+        entity_type: string;
+        entity_id: string;
+        revision: number;
+        change_type: string;
+      }>;
+    const changes = [];
+    let after = 0;
+    for (;;) {
+      const page = readPage(after);
+      if (page.length === 0) break;
+      changes.push(...page);
+      after = page.at(-1)?.cursor ?? after;
+    }
+
+    expect(changes.map((change) => change.cursor)).toEqual([1, 2, 3, 4]);
+    expect(changes.map((change) => change.revision)).toEqual([1, 1, 2, 3]);
+    expect(changes.at(-1)).toMatchObject({
+      entity_type: "proposal",
+      entity_id: "proposal-1",
+      revision: 3,
+      change_type: "delete",
+    });
+    expect(
+      database
+        .prepare(`
+          select cursor from sync_change_feed
+          where scope_kind = 'community' and scope_id = ?
+          order by cursor
+        `)
+        .all("community-2"),
+    ).toEqual([{ cursor: 1 }]);
+    expect(
+      database
+        .prepare("select count(*) as count from sync_change_feed where entity_type = ?")
+        .get("private_ballot"),
+    ).toEqual({ count: 0 });
     database.close();
   });
 

@@ -11,8 +11,8 @@
 
 - [x] 2.1 Add versioned Supabase SQL migrations for profiles, communities, membership, the six listing categories, listing images, tasks, and the task-completion outbox; verify migrations apply cleanly and constraints/search indexes with database tests.
 - [x] 2.2 Add versioned D1 migrations for proposals, private ballots and VT snapshots, governance execution history, versioned community policy, CC/WC balances, RT/VT balances in configured integer subunits, cumulative earned-RT milestones, RT mint/transfer/redemption ledger entries, and AI run logs; verify non-negative balances, policy-version constraints, idempotency, and indexes with D1 migration tests.
-- [ ] 2.3 Document schema ownership, migration commands, the `r2_assets` bucket and required Cloudflare bindings, and Supabase configuration; verify setup steps against a clean development environment.
-- [ ] 2.4 Add versioned IndexedDB schemas for scoped cached records, account-partitioned pending operations, per-source sync cursors, unresolved conflicts, and asset-cache metadata; verify transactional writes, schema upgrade, and storage-failure behavior in browser tests.
+- [x] 2.3 Document schema ownership, migration commands, the `r2_assets` bucket and required Cloudflare bindings, and Supabase configuration; verify setup steps against a clean development environment.
+- [x] 2.4 Add versioned IndexedDB schemas for scoped cached records, account-partitioned pending operations, per-source sync cursors, unresolved conflicts, and asset-cache metadata; verify transactional writes, schema upgrade, and storage-failure behavior in browser tests.
 - [ ] 2.5 Add version/revision metadata, per-store incremental change feeds, and deletion tombstones for synchronized Supabase and D1 records; verify cursor pagination returns changes without gaps or duplicate application.
 - [ ] 2.6 Add a versioned Supabase asset-metadata migration for `r2_key`, `cdn_url`, and `cache_version`, and configure the `r2_assets` bucket and Worker binding; verify migration, metadata constraints, and binding configuration in a clean development environment.
 

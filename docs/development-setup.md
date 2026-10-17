@@ -8,7 +8,7 @@
 | Supabase Storage | Avatars, identity-verification images, and other private user-specific media |
 | Cloudflare D1 | DAO proposals, voting snapshots and private ballots, governance executions, community policy versions, CC/WC/RT/VT balances and ledger entries, and AI run logs |
 | Cloudflare R2 | Public and semi-public non-profile assets in the `r2_assets` bucket |
-| Browser IndexedDB | Device-scoped cached records and pending operations; its schema is introduced by a later migration task |
+| Browser IndexedDB | Device-scoped cached records, account-partitioned pending operations, per-source cursors, unresolved conflicts, and public asset metadata |
 
 Workers are the application API boundary. The browser must not connect directly
 to D1, R2, or Supabase Postgres, and must not receive privileged provider
@@ -97,8 +97,9 @@ Do not run a remote bucket-creation command as part of local development.
    migration directory are declared in `wrangler.jsonc`.
 3. Use the R2 bucket only for public or semi-public non-profile objects.
    Supabase Storage remains the owner of private user media.
-4. The browser's local schema and synchronization store are not yet configured;
-   do not treat the service worker cache as a database.
+4. The browser's version-2 IndexedDB schema is defined in
+   `src/storage/indexed-db.ts`. Sync transport and server change feeds are
+   separate features; do not treat the service-worker cache as a database.
 
 Apply schema changes through new, ordered migration files in the owning store.
 Do not edit an already-applied production migration or use the development
